@@ -53,10 +53,13 @@ This example will send a pager message in one hour saying "Your lunch is ready"
 
 =over 4
 
-=item new ( HOST, [ OPTIONS ] )
+=item new ( [ HOST, ] [ OPTIONS ] )
 
 This is the constructor for a new Net::SNPP object. C<HOST> is the
 name of the remote host to which a SNPP connection is required.
+
+If C<HOST> is not given, then the C<SNPP_Host> specified in C<Net::Config>
+will be used.
 
 C<OPTIONS> are passed in a hash like fasion, using key and value pairs.
 Possible options are:
@@ -126,8 +129,9 @@ use Socket 1.3;
 use Carp;
 use IO::Socket;
 use Net::Cmd;
+use Net::Config;
 
-$VERSION = "1.03";
+$VERSION = "1.04";
 @ISA     = qw(Net::Cmd IO::Socket::INET);
 @EXPORT  = qw(CMD_2WAYERROR CMD_2WAYOK CMD_2WAYQUEUED);
 
@@ -166,15 +170,24 @@ sub new
 {
  my $self = shift;
  my $type = ref($self) || $self;
- my $host = shift;
+ my $host = shift if @_ % 2;
  my %arg  = @_; 
- my $obj = $type->SUPER::new(PeerAddr => $host, 
-			     PeerPort => $arg{Port} || 'snpp(444)',
-			     Proto    => 'tcp',
-			     Timeout  => defined $arg{Timeout}
+ my $hosts = defined $host ? [ $host ] : $NetConfig{SNPP_Hosts};
+ my $obj;
+
+ foreach $host (@{$hosts})
+  {
+   $obj = $type->SUPER::new(PeerAddr => $host, 
+			    PeerPort => $arg{Port} || 'snpp(444)',
+			    Proto    => 'tcp',
+			    Timeout  => defined $arg{Timeout}
 						? $arg{Timeout}
 						: 120
-			    ) or return undef;
+			    ) and last;
+  }
+
+ return undef
+	unless defined $obj;
 
  $obj->autoflush(1);
 

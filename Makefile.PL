@@ -5,7 +5,7 @@
 
 $NAME     = 'Net';
 $DISTNAME = "libnet";
-$VERSION  = "1.03";
+$VERSION  = "1.04";
 
 BEGIN { require 5.002 }
 
@@ -72,8 +72,7 @@ foreach (keys %INC) {
  last if ($config = $_) =~ s/^IO(.)File/Net$1Config/;
 }
 
-system($^X, 'Configure')
-	unless -f $config;
+system($^X, 'Configure', -f $config ? '-noprompt' : '-prompt');
 
 #--- Write the Makefile
 
@@ -91,6 +90,6 @@ WriteMakefile(
 		      DIST_DEFAULT => 'all tardist',
 		     },
  
-#	'clean'   => {FILES => join(" ", @clean)},
+	'clean'   => {FILES => join(" ", @clean)},
 );
 

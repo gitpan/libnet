@@ -1,3 +1,11 @@
+	o Changed Configure to prompt for hosts
+	o Added usage of Net::Config into Net::FTP, Net::PH, Net::SMTP,
+	  Net::NNTP, Net::POP3, Net::SNPP
+	o Fixed Net::FTP::get so that it does not put itself into
+	  binary mode every time
+	o Added a check for 550 to Net::FTP::mkdir
+	o Added force method to Net::PH
+
 Thu Jan 02 1996
 	o Release 1.03
 	o Fixed a bug in Net::SNPP::service_level

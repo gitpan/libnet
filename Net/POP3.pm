@@ -36,10 +36,13 @@ on the object.
 
 =over 4
 
-=item new ( HOST, [ OPTIONS ] )
+=item new ( [ HOST, ] [ OPTIONS ] )
 
 This is the constructor for a new Net::POP3 object. C<HOST> is the
 name of the remote host to which a POP3 connection is required.
+
+If C<HOST> is not given, then the C<POP3_Host> specified in C<Net::Config>
+will be used.
 
 C<OPTIONS> are passed in a hash like fasion, using key and value pairs.
 Possible options are:
@@ -152,8 +155,9 @@ use IO::Socket;
 use vars qw(@ISA $VERSION $debug);
 use Net::Cmd;
 use Carp;
+use Net::Config;
 
-$VERSION = "2.03";
+$VERSION = "2.04";
 
 @ISA = qw(Net::Cmd IO::Socket::INET);
 
@@ -161,15 +165,24 @@ sub new
 {
  my $self = shift;
  my $type = ref($self) || $self;
- my $host = shift;
+ my $host = shift if @_ % 2;
  my %arg  = @_; 
- my $obj = $type->SUPER::new(PeerAddr => $host, 
-			     PeerPort => $arg{Port} || 'pop3(110)',
-			     Proto    => 'tcp',
-			     Timeout  => defined $arg{Timeout}
+ my $hosts = defined $host ? [ $host ] : $NetConfig{POP3_Hosts};
+ my $obj;
+
+ foreach $host (@{$hosts})
+  {
+   $obj = $type->SUPER::new(PeerAddr => $host, 
+			    PeerPort => $arg{Port} || 'pop3(110)',
+			    Proto    => 'tcp',
+			    Timeout  => defined $arg{Timeout}
 						? $arg{Timeout}
 						: 120
-			    ) or return undef;
+			   ) and last;
+  }
+
+ return undef
+	unless defined $obj;
 
  ${*$obj}{'net_pop3_host'} = $host;
 

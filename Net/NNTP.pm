@@ -31,7 +31,8 @@ in RFC977. C<Net::NNTP> inherits its communication methods from C<Net::Cmd>
 This is the constructor for a new Net::NNTP object. C<HOST> is the
 name of the remote host to which a NNTP connection is required. If not
 given two environment variables are checked, first C<NNTPSERVER> then
-C<NEWSHOST>, if neither are set C<news> is used.
+C<NEWSHOST>, then C<Net::Config> is checked, and if a host is not found
+then C<news> is used.
 
 C<OPTIONS> are passed in a hash like fasion, using key and value pairs.
 Possible options are:
@@ -400,8 +401,9 @@ use IO::Socket;
 use Net::Cmd;
 use Carp;
 use Time::Local;
+use Net::Config;
 
-$VERSION = "2.08";
+$VERSION = "2.09";
 @ISA     = qw(Net::Cmd IO::Socket::INET);
 
 sub new
@@ -410,16 +412,29 @@ sub new
  my $type = ref($self) || $self;
  my $host = shift if @_ % 2;
  my %arg  = @_;
+ my $obj;
 
- $host ||= $ENV{NNTPSERVER} || $ENV{NEWSHOST} || "news";
+ $host ||= $ENV{NNTPSERVER} || $ENV{NEWSHOST};
 
- my $obj = $type->SUPER::new(PeerAddr => $host, 
-			     PeerPort => $arg{Port} || 'nntp(119)',
-			     Proto    => 'tcp',
-			     Timeout  => defined $arg{Timeout}
+ my $hosts = defined $host ? [ $host ] : $NetConfig{NNTP_Hosts};
+
+ @{$hosts} = qw(news)
+	unless @{$hosts};
+
+
+ foreach $host (@{$hosts})
+  {
+   $obj = $type->SUPER::new(PeerAddr => $host, 
+			    PeerPort => $arg{Port} || 'nntp(119)',
+			    Proto    => 'tcp',
+			    Timeout  => defined $arg{Timeout}
 						? $arg{Timeout}
 						: 120
-			    ) or return undef;
+			   ) and last;
+  }
+
+ return undef
+	unless defined $obj;
 
  ${*$obj}{'net_nntp_host'} = $host;
 

@@ -1,31 +1,79 @@
 #!/usr/local/bin/perl
 
-#######################################
-# User Configuration
-#######################################
-
-  @smtp_hosts = qw(mailhost.tiuk.ti.com);
-  @nntp_hosts = qw(news.ti.com);
-$ftp_firewall = qq(gate.ti.com);
-    @ph_hosts = qw(dles9.itg.ti.com);
-  @pop3_hosts = qw(mailhost.tiuk.ti.com);
-  @snpp_hosts = qw();
- $inet_domain = qq(tiuk.ti.com);
-
-#######################################
-# End of User Configuration
-#######################################
-
+use ExtUtils::MakeMaker;
 use IO::File;
+use Getopt::Long;
 
-my $config = "Net/Config.pm";
+my %opt = (prompt => 1);
 
-# Use %INC and IO::File to determine hoe this machine
-# maps package names to path names
+GetOptions(\%opt, qw(prompt!));
 
-foreach (keys %INC) {
- last if ($config = $_) =~ s/^IO(.)File/Net$1Config/;
+my $config;
+
+foreach (keys %INC)
+ {
+  last if ($config = $_) =~ s/^IO(.)File/Net$1Config/;
+ }
+
+defined($config) && -f $config
+	? require $config
+	: eval { require Net::Config };
+
+my %config = ();
+
+%config = %Net::Config::NetConfig
+	if defined %Net::Config::NetConfig;
+
+my $def;
+
+sub config_host_list
+{
+ my($key,$name) = @_;
+
+ my $def = exists $config{$key} ? join(" ", @{$config{$key}}) : "";
+ my $val = $opt{prompt}
+		? prompt("Enter a list of avaliable $name Hosts :",$def)
+		: $def;
+ my $res = [];
+
+ $val =~ s/(\A\s+|\s+\Z)//g;
+
+ @$res = split(/\s+/, $val)
+	if(length $val);
+
+ $config{$key} = $res;
 }
+
+sub config_host
+{
+ my($key,$name) = @_;
+
+ my $def = exists $config{$key} ? $config{$key} : "";
+ my $val = $opt{prompt}
+		? prompt("Enter your $name :",$def)
+		: $def;
+
+ $config{$key} = ($val =~ /(\S+)/)[0];
+}
+
+print "\n\nThe following questions all require a list of host names,\n"
+         ."separated with spaces. If you do not have a host avaliable\n"
+         ."for any of the services, then enter a single space, followed\n"
+         ."by <CR>. To accept the default, hit <CR>\n\n" if $opt{prompt};
+
+config_host_list(qw(NNTP_Hosts NNTP));
+config_host_list(qw(SMTP_Hosts SMTP));
+config_host_list(qw(POP3_Hosts POP3));
+config_host_list(qw(SNPP_Hosts SNPP));
+config_host_list(qw(PH_Hosts PH));
+
+print "\n\nThe following questions all require a single host name\n"
+          ."If you do not have a host avaliable for any of the services,\n"
+          ."then enter a single space, followed by <CR>\n\n" if $opt{prompt};
+
+config_host('FTP_FireWall', 'FTP firewall host name');
+config_host('INET_Domain', 'local internet domain name');
+
 
 my $fh = IO::File->new($config, "w") or
 		die "Cannot create `$file': $!";
@@ -50,18 +98,8 @@ use strict;
 %NetConfig = (
 ESQ
 
-my %var = (
-	   SMTP_Hosts   => \@smtp_hosts,
-	   NNTP_Hosts   => \@nntp_hosts,
-	   FTP_FireWall => $ftp_firewall,
-	   PH_Hosts     => \@ph_hosts,
-	   POP3_Hosts   => \@pop3_hosts,
-	   SNPP_Hosts   => \@snpp_hosts,
-	   INET_Domain  => $inet_domain,
-	  );
-
 my($k,$v);
-while(($k,$v) = each %var)
+while(($k,$v) = each %config)
  {
   my($r,$rv);
 
@@ -70,15 +108,16 @@ while(($k,$v) = each %var)
   if(ref($v))
    {
     my @r = grep { length } map { (/(\S+)/)[0] } @$v;
-    next unless @r;
+#    next unless @r;
     $rv = join(" ", @{$v});
-    $r = '[qw(' . $rv . ')]'
+    $r = @r ? '[qw(' . $rv . ')]' : '[]';
    }
   else
    {
     $rv = ($v =~ /(\S+)/)[0];
-    next unless length $rv;
-    $r = '"' . $rv . '"';
+#    next unless length $rv;
+#    $r = '"' . $rv . '"';
+    $r = length($rv) ? '"' . $rv . '"' : 'undef';
    }
 
   print STDERR sprintf(" %-16s => %s\n",$k,$rv);

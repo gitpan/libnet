@@ -58,6 +58,9 @@ C<Net::Cmd>.
 This is the constructor for a new Net::PH object. C<HOST> is the
 name of the remote host to which a PH connection is required.
 
+If C<HOST> is not given, then the C<SNPP_Host> specified in C<Net::Config>
+will be used.
+
 C<OPTIONS> is an optional list of named options which are passed in
 a hash like fasion, using key and value pairs. Possible options are:-
 
@@ -319,23 +322,32 @@ use Carp;
 use Socket 1.3;
 use IO::Socket;
 use Net::Cmd;
+use Net::Config;
 
-$VERSION = "2.09";
+$VERSION = "2.11";
 @ISA     = qw(Exporter Net::Cmd IO::Socket::INET);
 
 sub new
 {
  my $pkg  = shift;
- my $host = shift;
+ my $host = shift if @_ % 2;
  my %arg  = @_; 
+ my $hosts = defined $host ? [ $host ] : $NetConfig{PH_Hosts};
+ my $ph;
 
- my $ph = $pkg->SUPER::new(PeerAddr => $host, 
-			   PeerPort => $arg{Port} || 'csnet-ns(105)',
-			   Proto    => 'tcp',
-			   Timeout  => defined $arg{Timeout}
+ foreach $host (@{$hosts})
+  {
+   $ph = $pkg->SUPER::new(PeerAddr => $host, 
+			  PeerPort => $arg{Port} || 'csnet-ns(105)',
+			  Proto    => 'tcp',
+			  Timeout  => defined $arg{Timeout}
 					? $arg{Timeout}
 					: 120
-			  ) or return undef;
+			 ) and last;
+  }
+
+ return undef
+	unless defined $ph;
 
  $ph->autoflush(1);
 
@@ -563,6 +575,19 @@ sub delete
 
  $ph->command('delete', _arg_hash(\%arg))->response == CMD_OK;
 }
+
+sub force
+{
+ my $ph = shift; 
+ my $search = shift;
+ my $force = shift;
+
+ $ph->command(
+	"change", _arg_hash($search),
+	"force",  _arg_hash($force)
+ )->response == CMD_OK;
+}
+
 
 sub fields
 {

@@ -454,8 +454,9 @@ use IO::Socket;
 use Time::Local;
 use Net::Cmd;
 use Net::Telnet qw(TELNET_IAC TELNET_IP TELNET_DM);
+use Net::Config;
 
-$VERSION = "2.12";
+$VERSION = "2.13";
 @ISA     = qw(Exporter Net::Cmd IO::Socket::INET);
 
 sub new
@@ -469,7 +470,11 @@ sub new
 
  unless(defined inet_aton($peer))
   {
-   $fire = $ENV{FTP_FIREWALL} || $arg{Firewall} || undef;
+   $fire = $ENV{FTP_FIREWALL}
+	|| $arg{Firewall}
+	|| $NetConfig{FTP_FireWall}
+	|| undef;
+
    if(defined $fire)
     {
      $peer = $fire;
@@ -746,7 +751,7 @@ sub get
     }
   }
 
- if($ftp->binary && !binmode($loc))
+ if($ftp->type eq 'I' && !binmode($loc))
   {
    carp "Cannot binmode Local file $local: $!\n";
    $data->abort;
@@ -830,7 +835,7 @@ sub mkdir
 
      # 521 means directory already exists
      last
-        unless $ftp->ok || $ftp->code == 521;
+        unless $ftp->ok || $ftp->code == 521 || $ftp->code == 550;
     }
   }
 
@@ -887,7 +892,7 @@ sub _store_cmd
     }
   }
 
- if($ftp->binary && !binmode($loc))
+ if($ftp->type eq 'I' && !binmode($loc))
   {
    carp "Cannot binmode Local file $local: $!\n";
    return undef;
