@@ -1,6 +1,6 @@
 # Net::FTP.pm
 #
-# Copyright (c) 1995 Graham Barr <gbarr@ti.com>. All rights reserved.
+# Copyright (c) 1995 Graham Barr <gbarr@pobox.com>. All rights reserved.
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl itself.
 #
@@ -19,9 +19,14 @@ use IO::Socket;
 use Time::Local;
 use Net::Cmd;
 use Net::Config;
+use AutoLoader qw(AUTOLOAD);
 
-$VERSION = do { my @r=(q$Revision: 2.21 $=~/\d+/g); sprintf "%d."."%02d"x$#r,@r};
+$VERSION = "2.26"; # $Id: //depot/libnet/Net/FTP.pm#9$
 @ISA     = qw(Exporter Net::Cmd IO::Socket::INET);
+
+1;
+
+__END__
 
 sub new
 {
@@ -32,10 +37,11 @@ sub new
  my $host = $peer;
  my $fire = undef;
 
- unless(defined inet_aton($peer)) # GMB: Should I use Net::Ping here ??
+ # Should I use Net::Ping here ?? --GMB
+ if(exists($arg{Firewall}) || !defined(inet_aton($peer)))
   {
-   $fire = $ENV{FTP_FIREWALL}
-	|| $arg{Firewall}
+   $fire = $arg{Firewall}
+	|| $ENV{FTP_FIREWALL}
 	|| $NetConfig{ftp_firewall}
 	|| undef;
 
@@ -86,24 +92,18 @@ sub new
 ## User interface methods
 ##
 
-sub quit
-{
- my $ftp = shift;
-
- $ftp->_QUIT
-    && $ftp->close;
-}
-
 sub close
 {
  my $ftp = shift;
 
- ref($ftp) 
-    && defined fileno($ftp)
-    && $ftp->SUPER::close;
+ return 1
+   unless (ref($ftp) && defined fileno($ftp));
+
+ $ftp->_QUIT && $ftp->SUPER::close;
 }
 
 sub DESTROY { shift->close }
+sub quit    { shift->close }
 
 sub ascii  { shift->type('A',@_); }
 sub binary { shift->type('I',@_); }
@@ -176,7 +176,7 @@ sub login
 
  $ok = $ftp->_USER($user);
 
- # Some dumb firewall's don't prefix the connection messages
+ # Some dumb firewalls don't prefix the connection messages
  $ok = $ftp->response()
 	if($ok == CMD_OK && $ftp->code == 220 && $user =~ /\@/);
 
@@ -192,7 +192,7 @@ sub login
 	if ($rc);
 
      $pass = "-" . (getpwuid($>))[0] . "@" 
-        if (!defined $pass && $ruser =~ /^anonymous/o);
+        if (!defined $pass && (!defined($ruser) || $ruser =~ /^anonymous/o));
     }
 
    $ok = $ftp->_PASS($pass || "");
@@ -205,6 +205,14 @@ sub login
     if($ok == CMD_OK && defined ${*$ftp}{'net_ftp_firewall'});
 
  $ok == CMD_OK;
+}
+
+sub account
+{
+ @_ == 2 or croak 'usage: $ftp->account( ACCT )';
+ my $ftp = shift;
+ my $acct = shift;
+ $ftp->_ACCT($acct) == CMD_OK;
 }
 
 sub authorize
@@ -268,17 +276,19 @@ sub abort
  my $ftp = shift;
 
  send($ftp,pack("CC",$TELNET_IAC,$TELNET_IP),0);
- send($ftp,pack("C", $TELNET_IAC),MSG_OOB);
- send($ftp,pack("C", $TELNET_DM),0);
+ send($ftp,pack("CC", $TELNET_IAC, $TELNET_DM),MSG_OOB);
 
  $ftp->command("ABOR");
 
- defined ${*$ftp}{'net_ftp_dataconn'}
-    ? ${*$ftp}{'net_ftp_dataconn'}->close()
-    : $ftp->response();
+# defined ${*$ftp}{'net_ftp_dataconn'}
+#    ? ${*$ftp}{'net_ftp_dataconn'}->close()
+#    : $ftp->response();
+ 
+ ${*$ftp}{'net_ftp_dataconn'}->close()
+    if defined ${*$ftp}{'net_ftp_dataconn'};
 
- $ftp->response()
-    if $ftp->status == CMD_REJECT;
+ $ftp->response();
+#    if $ftp->status == CMD_REJECT;
 
  $ftp->status == CMD_OK;
 }
@@ -554,6 +564,21 @@ sub unique_name
  ${*$ftp}{'net_ftp_unique'} || undef;
 }
 
+sub supported {
+    @_ == 2 or croak 'usage: $ftp->supported( CMD )';
+    my $ftp = shift;
+    my $cmd = uc shift;
+    my $hash = ${*$ftp}{'net_ftp_supported'} ||= {};
+
+    return $hash->{$cmd}
+        if exists $hash->{$cmd};
+
+    my $ok = $ftp->_HELP($cmd) &&
+        $ftp->message !~ /unimplemented/i;
+
+    $hash->{$cmd} = $ok;
+}
+
 ##
 ## Depreciated methods
 ##
@@ -602,6 +627,8 @@ sub _dataconn
  my $data = undef;
  my $pkg = "Net::FTP::" . $ftp->type;
 
+ eval "require " . $pkg;
+
  $pkg =~ s/ /_/g;
 
  delete ${*$ftp}{'net_ftp_dataconn'};
@@ -645,6 +672,7 @@ sub _list_cmd
  return undef
 	unless(defined $data);
 
+ require Net::FTP::A;
  bless $data, "Net::FTP::A"; # Force ASCII mode
 
  my $databuf = '';
@@ -685,9 +713,16 @@ sub _data_cmd
      $ftp->command($cmd,@_);
      $data = $ftp->_dataconn();
      $ok = CMD_INFO == $ftp->response();
+     if($ok) 
+      {
+       $data->reading
+         if $data && $cmd =~ /RETR|LIST|NLST/;
+       return $data
+      }
+     $data->_close
+	if $data;
     }
-   return $ok ? $data
-    	      : ($data->_close, undef)[1];
+   return undef;
   }
 
  $ok = $ftp->port
@@ -752,7 +787,7 @@ sub parse_response
 
  # Darn MS FTP server is a load of CRAP !!!!
  return ()
-	unless ${*$ftp}{'net_cmd_code'};
+	unless ${*$ftp}{'net_cmd_code'} + 0;
 
  (${*$ftp}{'net_cmd_code'},1);
 }
@@ -806,7 +841,7 @@ sub pasv_wait
  return 1;
 }
 
-sub cmd { shift->command(@_)->responce() }
+sub cmd { shift->command(@_)->response() }
 
 ########################################
 #
@@ -830,6 +865,7 @@ sub _ACCT { shift->command("ACCT",@_)->response() == CMD_OK }
 sub _RESP { shift->command("RESP",@_)->response() == CMD_OK }
 sub _MDTM { shift->command("MDTM",@_)->response() == CMD_OK }
 sub _SIZE { shift->command("SIZE",@_)->response() == CMD_OK }
+sub _HELP { shift->command("HELP",@_)->response() == CMD_OK }
 sub _APPE { shift->command("APPE",@_)->response() == CMD_INFO }
 sub _LIST { shift->command("LIST",@_)->response() == CMD_INFO }
 sub _NLST { shift->command("NLST",@_)->response() == CMD_INFO }
@@ -844,242 +880,12 @@ sub _AUTH { shift->command("AUTH",@_)->response() }
 
 sub _ALLO { shift->unsupported(@_) }
 sub _SMNT { shift->unsupported(@_) }
-sub _HELP { shift->unsupported(@_) }
 sub _MODE { shift->unsupported(@_) }
 sub _SITE { shift->unsupported(@_) }
 sub _SYST { shift->unsupported(@_) }
 sub _STAT { shift->unsupported(@_) }
 sub _STRU { shift->unsupported(@_) }
 sub _REIN { shift->unsupported(@_) }
-
-##
-## Generic data connection package
-##
-
-package Net::FTP::dataconn;
-
-use Carp;
-use vars qw(@ISA $timeout);
-use Net::Cmd;
-
-@ISA = qw(IO::Socket::INET);
-
-sub abort
-{
- my $data = shift;
- my $ftp  = ${*$data}{'net_ftp_cmd'};
-
- $ftp->abort; # this will close me
-}
-
-sub _close
-{
- my $data = shift;
- my $ftp  = ${*$data}{'net_ftp_cmd'};
-
- $data->SUPER::close();
-
- delete ${*$ftp}{'net_ftp_dataconn'}
-    if exists ${*$ftp}{'net_ftp_dataconn'} &&
-        $data == ${*$ftp}{'net_ftp_dataconn'};
-}
-
-sub close
-{
- my $data = shift;
- my $ftp  = ${*$data}{'net_ftp_cmd'};
-
- $data->_close;
-
- $ftp->response() == CMD_OK &&
-    $ftp->message =~ /unique file name:\s*(\S*)\s*\)/ &&
-    (${*$ftp}{'net_ftp_unique'} = $1);
-
- $ftp->status == CMD_OK;
-}
-
-sub _select
-{
- my    $data 	= shift;
- local *timeout = \$_[0]; shift;
- my    $rw 	= shift;
-
- my($rin,$win);
-
- return 1 unless $timeout;
-
- $rin = '';
- vec($rin,fileno($data),1) = 1;
-
- $win = $rw ? undef : $rin;
- $rin = undef unless $rw;
-
- my $nfound = select($rin, $win, undef, $timeout);
-
- croak "select: $!"
-	if $nfound < 0;
-
- return $nfound;
-}
-
-sub can_read
-{
- my    $data    = shift;
- local *timeout = \$_[0];
-
- $data->_select($timeout,1);
-}
-
-sub can_write
-{
- my    $data    = shift;
- local *timeout = \$_[0];
-
- $data->_select($timeout,0);
-}
-
-sub cmd
-{
- my $ftp = shift;
-
- ${*$ftp}{'net_ftp_cmd'};
-}
-
-
-@Net::FTP::L::ISA = qw(Net::FTP::I);
-@Net::FTP::E::ISA = qw(Net::FTP::I);
-
-##
-## Package to read/write on ASCII data connections
-##
-
-package Net::FTP::A;
-
-use vars qw(@ISA $buf);
-use Carp;
-
-@ISA = qw(Net::FTP::dataconn);
-
-sub read
-{
- my    $data 	= shift;
- local *buf 	= \$_[0]; shift;
- my    $size 	= shift || croak 'read($buf,$size,[$offset])';
- my    $offset 	= shift || 0;
- my    $timeout = $data->timeout;
-
- croak "Bad offset"
-	if($offset < 0);
-
- $offset = length $buf
-	if($offset > length $buf);
-
- ${*$data} ||= "";
- my $l = 0;
-
- READ:
-  {
-   $data->can_read($timeout) or
-	croak "Timeout";
-
-   my $n = sysread($data, ${*$data}, $size, length ${*$data});
-
-   return $n
-	unless($n >= 0);
-
-   ${*$data} =~ s/(\015)?(?!\012)\Z//so;
-   my $lf = $1 || "";
-
-   ${*$data} =~ s/\015\012/\n/sgo;
-
-   substr($buf,$offset) = ${*$data};
-
-   $l += length(${*$data});
-   $offset += length(${*$data});
-
-   ${*$data} = $lf;
-   
-   redo READ
-     if($l == 0 && $n > 0);
-
-   if($n == 0 && $l == 0)
-    {
-     substr($buf,$offset) = ${*$data};
-     ${*$data} = "";
-    }
-  }
-
- return $l;
-}
-
-sub write
-{
- my    $data 	= shift;
- local *buf 	= \$_[0]; shift;
- my    $size 	= shift || croak 'write($buf,$size,[$timeout])';
- my    $timeout = @_ ? shift : $data->timeout;
-
- $data->can_write($timeout) or
-	croak "Timeout";
-
- # What is previous pkt ended in \015 or not ??
-
- my $tmp;
- ($tmp = $buf) =~ s/(?!\015)\012/\015\012/sg;
-
- my $len = $size + length($tmp) - length($buf);
- my $wrote = syswrite($data, $tmp, $len);
-
- if($wrote >= 0)
-  {
-   $wrote = $wrote == $len ? $size
-			   : $len - $wrote
-  }
-
- return $wrote;
-}
-
-##
-## Package to read/write on BINARY data connections
-##
-
-package Net::FTP::I;
-
-use vars qw(@ISA $buf);
-use Carp;
-
-@ISA = qw(Net::FTP::dataconn);
-
-sub read
-{
- my    $data 	= shift;
- local *buf 	= \$_[0]; shift;
- my    $size    = shift || croak 'read($buf,$size,[$timeout])';
- my    $timeout = @_ ? shift : $data->timeout;
-
- $data->can_read($timeout) or
-	croak "Timeout";
-
- my $n = sysread($data, $buf, $size);
-
- $n;
-}
-
-sub write
-{
- my    $data    = shift;
- local *buf     = \$_[0]; shift;
- my    $size    = shift || croak 'write($buf,$size,[$timeout])';
- my    $timeout = @_ ? shift : $data->timeout;
-
- $data->can_write($timeout) or
-	croak "Timeout";
-
- syswrite($data, $buf, $size);
-}
-
-
-1;
 
 __END__
 
@@ -1251,14 +1057,15 @@ Get a directory listing of C<DIR>, or the current directory in long format.
 
 Returns a reference to a list of lines returned from the server.
 
-=item get ( REMOTE_FILE [, LOCAL_FILE ] )
+=item get ( REMOTE_FILE [, LOCAL_FILE [, WHERE]] )
 
 Get C<REMOTE_FILE> from the server and store locally. C<LOCAL_FILE> may be
 a filename or a filehandle. If not specified the the file will be stored in
 the current directory with the same leafname as the remote file.
 
-If C<WHERE> is specified, continue transfer of the remote file
-from this point.
+If C<WHERE> is given then the first C<WHERE> bytes of the file will
+not be transfered, and the remaining bytes will be appended to
+the local file if it already exists.
 
 Returns C<LOCAL_FILE>, or the generated local file name if C<LOCAL_FILE>
 is not given.
@@ -1272,6 +1079,10 @@ directory with the same leafname as C<LOCAL_FILE>.
 
 Returns C<REMOTE_FILE>, or the generated remote filename if C<REMOTE_FILE>
 is not given.
+
+B<NOTE>: If for some reason the transfer does not complete and an error is
+returned then the contents that had been transfered will not be remove
+automatically.
 
 =item put_unique ( LOCAL_FILE [, REMOTE_FILE ] )
 
@@ -1298,6 +1109,10 @@ Returns the I<modification time> of the given file
 =item size ( FILE )
 
 Returns the size in bytes for the given file.
+
+=item supported ( CMD )
+
+Returns TRUE if the remote server supports the given command.
 
 =back
 
@@ -1509,7 +1324,7 @@ run of your program which does yield the problem.
 
 =head1 AUTHOR
 
-Graham Barr <gbarr@ti.com>
+Graham Barr <gbarr@pobox.com>
 
 =head1 SEE ALSO
 

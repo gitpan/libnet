@@ -5,7 +5,6 @@
 use strict;
 use IO::File;
 use Getopt::Std;
-use Data::Dumper;
 use ExtUtils::MakeMaker qw(prompt);
 
 use vars qw($opt_d $opt_o);
@@ -177,18 +176,8 @@ sub default_hostname
 
 getopts('do:');
 
-unless(defined($config_pm = $opt_o))
- {
-  foreach (keys %INC)
-   {
-    last if ($config_pm = $_) =~ s/^IO(.)File/Net$1Config/;
-   }
- }
-
-die "Cannot determine .pm filename for Net::Config"
-	unless defined($config_pm);
-
-push(@INC,".");
+$config_pm = "libnet.cfg"
+	unless(defined($config_pm = $opt_o));
 
 $have_old = -f $config_pm
 	? require $config_pm
@@ -252,13 +241,13 @@ EDQ
 print <<EDQ;
 
 The following questions all require a list of host names, separated
-with spaces. If you do not have a host avaliable for any of the
+with spaces. If you do not have a host available for any of the
 services, then enter a single space, followed by <CR>. To accept the
 default, hit <CR>
 
 EDQ
 
-$msg = 'Enter a list of avaliable NNTP hosts :';
+$msg = 'Enter a list of available NNTP hosts :';
 
 $def = $oldcfg{'nntp_hosts'} ||
 	[ default_hostname($ENV{NNTPSERVER},$ENV{NEWSHOST},'news') ];
@@ -267,7 +256,7 @@ $cfg{'nntp_hosts'} = get_host_list($msg,$def);
 
 #---------------------------------------------------------------------------
 
-$msg = 'Enter a list of avaliable SMTP hosts :';
+$msg = 'Enter a list of available SMTP hosts :';
 
 $def = $oldcfg{'smtp_hosts'} ||
 	[ default_hostname(split(/:/,$ENV{SMTPHOSTS} || ""), 'mailhost') ];
@@ -276,7 +265,7 @@ $cfg{'smtp_hosts'} = get_host_list($msg,$def);
 
 #---------------------------------------------------------------------------
 
-$msg = 'Enter a list of avaliable POP3 hosts :';
+$msg = 'Enter a list of available POP3 hosts :';
 
 $def = $oldcfg{'pop3_hosts'} || [];
 
@@ -284,7 +273,7 @@ $cfg{'pop3_hosts'} = get_host_list($msg,$def);
 
 #---------------------------------------------------------------------------
 
-$msg = 'Enter a list of avaliable SNPP hosts :';
+$msg = 'Enter a list of available SNPP hosts :';
 
 $def = $oldcfg{'snpp_hosts'} || [];
 
@@ -292,7 +281,7 @@ $cfg{'snpp_hosts'} = get_host_list($msg,$def);
 
 #---------------------------------------------------------------------------
 
-$msg = 'Enter a list of avaliable PH Hosts   :'  ;
+$msg = 'Enter a list of available PH Hosts   :'  ;
 
 $def = $oldcfg{'ph_hosts'} ||
 	[ default_hostname('dirserv') ];
@@ -301,7 +290,7 @@ $cfg{'ph_hosts'}   =  get_host_list($msg,$def);
 
 #---------------------------------------------------------------------------
 
-$msg = 'Enter a list of avaliable TIME Hosts   :'  ;
+$msg = 'Enter a list of available TIME Hosts   :'  ;
 
 $def = $oldcfg{'time_hosts'} || [];
 
@@ -309,7 +298,7 @@ $cfg{'time_hosts'} = get_host_list($msg,$def);
 
 #---------------------------------------------------------------------------
 
-$msg = 'Enter a list of avaliable DAYTIME Hosts   :'  ;
+$msg = 'Enter a list of available DAYTIME Hosts   :'  ;
 
 $def = $oldcfg{'daytime_hosts'} || $oldcfg{'time_hosts'};
 
@@ -340,7 +329,7 @@ $cfg{'ftp_firewall'} = get_hostname($msg,$def);
 ###SOCKS is a commonly used firewall protocol. If you use SOCKS firewalls
 ###then enter a list of hostames
 ###
-###Enter a list of avaliable SOCKS hosts :
+###Enter a list of available SOCKS hosts :
 ###EDQ
 ###
 ###$def = $cfg{'socks_hosts'} ||
@@ -429,7 +418,10 @@ if($have_old && exists $INC{$config_pm}) {
     while(@old) {
 	last if(pop(@old) =~ /^\s*\);/);
     }
-    $old[-1] =~ s/,?\s*\n/,\n/ if @old;
+    pop @old
+	while(@old && $old[-1] !~ /[^\w\n]/);
+    $old[-1] =~ s/,?\s*\n/,\n/
+	if @old;
     $fh->close;
 }
 
@@ -466,7 +458,7 @@ foreach $key (keys %cfg) {
     $fh->print("\t",$key," => ",$val,",\n");
 }
 
-$fh->print("\n);\n1;\n");
+$fh->print(");\n1;\n");
 
 $fh->close;
 
@@ -499,22 +491,22 @@ sub set
  require File::Copy;
     
  my $mod = $INC{'Net/Config.pm'} or
-	Carp::croak("Can't find myself");
+	Carp::croak "Can't find myself";
 
  my $bak = $mod . "~";
 
  print "Updating $mod...\n";
 
  File::Copy::copy($mod,$bak) or
-	Carp::croak("Cannot create backup file $bak: $!");
+	Carp::croak "Cannot create backup file $bak: $!";
 
  print "...backup at $bak\n";
 
- my $old = new IO::File($bak,"r") or
-	Carp::croak("Can't open $bak: $!");
+ my $old = new IO::File $bak,"r" or
+	Carp::croak "Can't open $bak: $!";
 
- my $new = new IO::File($mod,"w") or
-	Carp::croak("Can't open $mod: $!");
+ my $new = new IO::File $mod,"w" or
+	Carp::croak "Can't open $mod: $!";
 
  # If we fail below, then we must restore from backup
  local $SIG{'__DIE__'} = sub {

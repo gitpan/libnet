@@ -1,6 +1,6 @@
 # Net::Cmd.pm
 #
-# Copyright (c) 1995-1997 Graham Barr <gbarr@ti.com>. All rights reserved.
+# Copyright (c) 1995-1997 Graham Barr <gbarr@pobox.com>. All rights reserved.
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl itself.
 
@@ -13,7 +13,7 @@ use strict;
 use vars qw(@ISA @EXPORT $VERSION);
 use Carp;
 
-$VERSION = "2.0801";
+$VERSION = "2.09";
 @ISA     = qw(Exporter);
 @EXPORT  = qw(CMD_INFO CMD_OK CMD_MORE CMD_REJECT CMD_ERROR CMD_PENDING);
 
@@ -205,9 +205,13 @@ sub getline
     if scalar(@{${*$cmd}{'net_cmd_lines'}});
 
  my $partial = ${*$cmd}{'net_cmd_partial'} || "";
+ my $fd = fileno($cmd);
+ 
+ return undef
+	unless defined $fd;
 
  my $rin = "";
- vec($rin,fileno($cmd),1) = 1;
+ vec($rin,$fd,1) = 1;
 
  my $buf;
 
@@ -275,6 +279,9 @@ sub response
  while(1)
   {
    my $str = $cmd->getline();
+
+   return CMD_ERROR
+	unless defined($str);
 
    $cmd->debug_print(0,$str)
      if ($cmd->debug);
@@ -533,7 +540,7 @@ of C<response> and C<status>. The sixth is C<CMD_PENDING>.
 
 =head1 AUTHOR
 
-Graham Barr <gbarr@ti.com>
+Graham Barr <gbarr@pobox.com>
 
 =head1 COPYRIGHT
 

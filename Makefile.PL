@@ -5,7 +5,7 @@
 
 $NAME     = 'Net';
 $DISTNAME = "libnet";
-$VERSION  = "1.0506";
+$VERSION  = "1.06";
 
 BEGIN { require 5.002 }
 
@@ -47,6 +47,32 @@ sub chk_version
  $vnum >= $wanted;
 }
 
+sub MY::post_initialize
+{
+ my ($self) = @_;
+
+#--- Create Net::Config
+
+use IO::File;
+
+my $config_pm = "Net/Config.pm";
+my $libnet_cfg = "libnet.cfg";
+
+# Use %INC and IO::File to determine how this machine
+# maps package names to path names
+
+foreach (keys %INC) {
+ last if ($config_pm = $_) =~ s/^IO(.)File/Net${1}Config/;
+}
+
+system($^X, 'Configure')
+	unless -f $libnet_cfg;
+
+ $self->{PM}->{$libnet_cfg} = $self->catfile('$(INST_ARCHLIBDIR)',$config_pm);
+
+ "";
+}
+
 #--- Check for Socket
 
 chk_version(Socket => '1.30') or
@@ -61,25 +87,10 @@ chk_version(IO::Socket => '1.05') or
 
 chk_version(Data::Dumper => '0.01') or
     warn  "\n"
-	. "*** To be able to use the libnet modules you *MUST* have\n"
-	. "    Data::Dumper installed. You can obtain this from\n"
+	. "*** To be able to use the dynamic capabilities of Net::Config\n"
+	. "    you will need to install Data::Dumper\n"
+	. "    You can obtain this from\n"
 	. "    CPAN/modules/by-module/Data/Data-Dumper-x.x.tar.gz\n\n";
-
-#--- Create Net::Config
-
-use IO::File;
-
-my $config_pm = "Net/Config.pm";
-
-# Use %INC and IO::File to determine how this machine
-# maps package names to path names
-
-foreach (keys %INC) {
- last if ($config_pm = $_) =~ s/^IO(.)File/Net${1}Config/;
-}
-
-system($^X, 'Configure')
-	unless -f $config_pm;
 
 #--- Write the Makefile
 
@@ -91,7 +102,7 @@ WriteMakefile(
 	VERSION   => $VERSION,
 	DISTNAME  => $DISTNAME,
 	NAME      => $NAME,
- 
+
 	'dist'    => {COMPRESS => 'gzip -9f',
 		      SUFFIX   => '.gz', 
 		      DIST_DEFAULT => 'all tardist',
@@ -100,7 +111,7 @@ WriteMakefile(
 	'clean'   => {FILES => join(" ", @clean,  )},
 	'realclean'   => {FILES => $config_pm},
 	PREREQ_PM => {
-			Data::Dumper => 0,
+			Data::Dumper => 0.01,
 			Socket => 1.3,
 			IO::Socket => 1.05
 		    },

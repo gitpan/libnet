@@ -24,10 +24,9 @@ Protocol
 
 FUTURE WORK
 
-Some possible future packages include
+Work in progress includes
 
- Net::Finger (RFC1288)
- Net::Resolv
+ Net::SNMP	RFC 1157	Simple Network Management Protocol
 
 AVAILABILITY
 
@@ -81,7 +80,7 @@ SUPPORT
 
 Questions about how to use this library should be directed to the
 comp.lang.perl.modules USENET Newsgroup.  Bug reports and suggestions
-for improvements can be sendt to me at <gbarr@ti.com>. 
+for improvements can be sendt to me at <gbarr@pobox.com>. 
 
 Most of the modules in this library have an option to output a debug
 transcript to STDERR. When reporting bugs/problems please, if possible,

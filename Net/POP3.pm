@@ -1,6 +1,6 @@
 # Net::POP3.pm
 #
-# Copyright (c) 1995-1997 Graham Barr <gbarr@ti.com>. All rights reserved.
+# Copyright (c) 1995-1997 Graham Barr <gbarr@pobox.com>. All rights reserved.
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl itself.
 
@@ -13,7 +13,7 @@ use Net::Cmd;
 use Carp;
 use Net::Config;
 
-$VERSION = do { my @r=(q$Revision: 2.9 $=~/\d+/g); sprintf "%d."."%02d"x$#r,@r};
+$VERSION = "2.10";
 
 @ISA = qw(Net::Cmd IO::Socket::INET);
 
@@ -52,6 +52,8 @@ sub new
    return undef;
   }
 
+ ${*$obj}{'net_pop3_banner'} = $obj->message;
+
  $obj;
 }
 
@@ -85,10 +87,50 @@ sub login
     $me->pass($pass);
 }
 
+sub apop
+{
+ @_ >= 1 && @_ <= 3 or croak 'usage: $pop3->apop( USER, PASS )';
+ my($me,$user,$pass) = @_;
+ my $banner;
+
+ unless(eval { require MD5 })
+  {
+   carp "You need to install MD5 to use the APOP command";
+   return undef;
+  }
+
+ return undef
+   unless ( $banner = (${*$me}{'net_pop3_banner'} =~ /(<.*>)/)[0] );
+
+ if(@_ <= 2)
+  {
+   require Net::Netrc;
+
+   $user ||= (getpwuid($>))[0];
+
+   my $m = Net::Netrc->lookup(${*$me}{'net_pop3_host'},$user);
+
+   $m ||= Net::Netrc->lookup(${*$me}{'net_pop3_host'});
+
+   $pass = $m ? $m->password || ""
+              : "";
+  }
+
+ my $md = new MD5;
+ $md->add($banner,$pass);
+
+ return undef
+    unless($me->_APOP($user,$md->hexdigest));
+
+ $me->message =~ /(\d+)\s+message/io;
+
+ ${*$me}{'net_pop3_count'} = $1 || 0;
+}
+
 sub user
 {
  @_ == 2 or croak 'usage: $pop3->user( USER )';
- $_[0]->_USER($_[1]);
+ $_[0]->_USER($_[1]) ? 1 : undef;
 }
 
 sub pass
@@ -194,18 +236,46 @@ sub delete
  $_[0]->_DELE($_[1]);
 }
 
-sub _USER { shift->command('USER',$_[0])->response() == CMD_OK }
-sub _PASS { shift->command('PASS',$_[0])->response() == CMD_OK }
-sub _RPOP { shift->command('RPOP',$_[0])->response() == CMD_OK }
+sub uidl
+{
+ @_ == 1 || @_ == 2 or croak 'usage: $pop3->uidl( [ MSGNUM ] )';
+ my $me = shift;
+ my $uidl;
+
+ $me->_UIDL(@_) or
+    return undef;
+ if(@_)
+  {
+   $uidl = ($me->message =~ /\d+\s+([\041-\176]+)/)[0];
+  }
+ else
+  {
+   my $ref = $me->read_until_dot;
+   my $ln;
+   $uidl = {};
+   foreach $ln (@$ref) {
+     my($msg,$uid) = $ln =~ /^\s*(\d+)\s+([\041-\176]+)/;
+     $uidl->{$msg} = $uid;
+   }
+  }
+ return $uidl;
+}
+
+sub _STAT { shift->command('STAT')->response() == CMD_OK }
+sub _LIST { shift->command('LIST',@_)->response() == CMD_OK }
 sub _RETR { shift->command('RETR',$_[0])->response() == CMD_OK }
 sub _DELE { shift->command('DELE',$_[0])->response() == CMD_OK }
-sub _TOP  { shift->command('TOP', @_)->response() == CMD_OK }
-sub _LIST { shift->command('LIST',@_)->response() == CMD_OK }
 sub _NOOP { shift->command('NOOP')->response() == CMD_OK }
 sub _RSET { shift->command('RSET')->response() == CMD_OK }
-sub _LAST { shift->command('LAST')->response() == CMD_OK }
 sub _QUIT { shift->command('QUIT')->response() == CMD_OK }
-sub _STAT { shift->command('STAT')->response() == CMD_OK }
+sub _TOP  { shift->command('TOP', @_)->response() == CMD_OK }
+sub _UIDL { shift->command('UIDL')->response() == CMD_OK }
+sub _USER { shift->command('USER',$_[0])->response() == CMD_OK }
+sub _PASS { shift->command('PASS',$_[0])->response() == CMD_OK }
+sub _APOP { shift->command('APOP',@_)->response() == CMD_OK }
+
+sub _RPOP { shift->command('RPOP',$_[0])->response() == CMD_OK }
+sub _LAST { shift->command('LAST')->response() == CMD_OK }
 
 sub close
 {
@@ -336,6 +406,17 @@ will be used.
 
 Returns the number of messages in the mailbox.
 
+If the server cannot authenticate C<USER> the I<undef> will be returned.
+
+=item apop ( USER, PASS )
+
+Authenticate with the server identifying as C<USER> with password C<PASS>.
+Similar ti L<login>, but the password is not sent in clear text. 
+
+To use this method you must have the MD5 package installed, if you do not
+this method will return I<undef>
+
+
 =item top ( MSGNUM [, NUMLINES ] )
 
 Get the header and the first C<NUMLINES> of the body for the message
@@ -364,6 +445,12 @@ Returns the highest C<MSGNUM> of all the messages accessed.
 
 Returns an array of two elements. These are the number of undeleted
 elements and the size of the mbox in octets.
+
+=item uidl ( [ MSGNUM ] )
+
+Returns a unique identifier for C<MSGNUM> if given. If C<MSGNUM> is not
+given C<uidl> returns a reference to a hash where the keys are the
+message numbers and the values are the unique identifiers.
 
 =item delete ( MSGNUM )
 
@@ -396,7 +483,7 @@ L<Net::Cmd>
 
 =head1 AUTHOR
 
-Graham Barr <gbarr@ti.com>
+Graham Barr <gbarr@pobox.com>
 
 =head1 COPYRIGHT
 

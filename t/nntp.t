@@ -8,7 +8,7 @@ unless(@{$NetConfig{nntp_hosts}} && $NetConfig{test_hosts}) {
     exit 0;
 }
 
-print "1..5\n";
+print "1..4\n";
 
 my $i = 1;
 
@@ -17,21 +17,17 @@ $nntp = Net::NNTP->new(Debug => 0)
 
 print "ok 1\n";
 
-$list = $nntp->list or print "not ";
+@grp = $nntp->group('test');
+print "not " unless @grp;
 print "ok 2\n";
 
-$grp = (keys %$list)[0];
 
-@g = $nntp->group($grp);
-print "not " unless @g;
-print "ok 3\n";
-
-if($g[1] > $g[2]) {
-    $nntp->head($g[1]) or print "not ";
+if($grp[2] > $grp[1]) {
+    $nntp->head($grp[1]) or print "not ";
 }
-print "ok 4\n";
+print "ok 3\n";
 
 
 $nntp->quit or print "not ";
-print "ok 5\n";
+print "ok 4\n";
 
