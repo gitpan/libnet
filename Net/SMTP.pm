@@ -184,7 +184,14 @@ Graham Barr <Graham.Barr@tiuk.ti.com>
 
 =head1 REVISION
 
-$Revision: 2.0 $
+$Revision: 2.1 $
+$Date: 1996/08/20 20:23:56 $
+
+The VERSION is derived from the revision by changing each number after the
+first dot into a 2 digit number so
+
+	Revision 1.8   => VERSION 1.08
+	Revision 1.2.3 => VERSION 1.0203
 
 =head1 COPYRIGHT
 
@@ -203,7 +210,7 @@ use Carp;
 use IO::Socket;
 use Net::Cmd;
 
-$VERSION = sprintf("%d.%02d", q$Revision: 2.0 $ =~ /(\d+)\.(\d+)/);
+$VERSION = do{my @r=(q$Revision: 2.1 $=~/(\d+)/g);sprintf "%d."."%02d"x$#r,@r};
 
 @ISA = qw(Net::Cmd IO::Socket::INET);
 
@@ -216,8 +223,10 @@ sub new
  my $obj = $type->SUPER::new(PeerAddr => $host, 
 			     PeerPort => $arg{Port} || 'smtp(25)',
 			     Proto    => 'tcp',
-			     Timeout  => $arg{Timeout} || 120
-			    );
+			     Timeout  => defined $arg{Timeout}
+						? $arg{Timeout}
+						: 120
+			    ) or return undef;
 
  $obj->autoflush(1);
 
@@ -228,6 +237,8 @@ sub new
    $obj->SUPER::close();
    return undef;
   }
+
+ ${*$obj}{'net_smtp_host'} = $host;
 
  (${*$obj}{'net_smtp_domain'}) = $obj->message =~ /\A\s*(\S+)/;
 
@@ -254,13 +265,32 @@ sub hello
 	      eval {
 		    require Net::Domain;
 		    Net::Domain::hostdomain();
-		   };
- my $ok = $me->_HELO($domain || "");
- my $remote = undef;
+		   } ||
+		"";
+ my $ok = $me->_EHLO($domain);
+ my $msg;
 
- ($remote) = $me->message =~ /\A(\S+)/ if($ok);
+ if($ok)
+  {
+   $msg = $me->message;
 
- return $remote;
+   my $h = ${*$me}{'net_smtp_esmtp'} = {};
+   my $ext;
+   foreach $ext (qw(8BITMIME CHECKPOINT DSN SIZE))
+    {
+     $h->{$ext} = 1
+	if $msg =~ /\b${ext}\b/;
+    }
+  }
+ else
+  {
+   $msg = $me->message
+	if $me->_HELO($domain);
+  }
+
+ $ok && $msg =~ /\A(\S+)/
+	? $1
+	: undef;
 }
 
 sub _addr
@@ -276,7 +306,97 @@ sub _addr
  return "<" . $addr . ">";
 }
 
-sub mail	  { shift->_MAIL("FROM:" . _addr($_[0])) }
+
+sub mail
+{
+ my $me = shift;
+ my $addr = _addr(shift);
+ my $opts = "";
+
+ if(@_)
+  {
+   my %opt = @_;
+   my($k,$v);
+
+   if(exists ${*$me}{'net_smtp_esmtp'})
+    {
+     my $esmtp = ${*$me}{'net_smtp_esmtp'};
+
+     if(defined($v = delete $opt{Size}))
+      {
+       if(exists $esmtp->{SIZE})
+        {
+         $opts .= sprintf " SIZE=%d", $v + 0
+        }
+       else
+        {
+	 carp 'Net::SMTP::mail: SIZE option not supported by host';
+        }
+      }
+
+     if(defined($v = delete $opt{Return}))
+      {
+       if(exists $esmtp->{DSN})
+        {
+	 $opts .= " RET=" . uc $v
+        }
+       else
+        {
+	 carp 'Net::SMTP::mail: DSN option not supported by host';
+        }
+      }
+
+     if(defined($v = delete $opt{Bits}))
+      {
+       if(exists $esmtp->{'8BITMIME'})
+        {
+	 $opts .= $v == 8 ? " BODY=8BITMIME" : " BODY=7BIT"
+        }
+       else
+        {
+	 carp 'Net::SMTP::mail: 8BITMIME option not supported by host';
+        }
+      }
+
+     if(defined($v = delete $opt{Transaction}))
+      {
+       if(exists $esmtp->{CHECKPOINT})
+        {
+	 $opts .= " TRANSID=" . _addr($v);
+        }
+       else
+        {
+	 carp 'Net::SMTP::mail: CHECKPOINT option not supported by host';
+        }
+      }
+
+     if(defined($v = delete $opt{Envelope}))
+      {
+       if(exists $esmtp->{DSN})
+        {
+	 $v =~ s/([^\041-\176]|=|\+)/sprintf "+%02x", ord($1)/sge;
+	 $opts .= " ENVID=$v"
+        }
+       else
+        {
+	 carp 'Net::SMTP::mail: DSN option not supported by host';
+        }
+      }
+
+     carp 'Net::SMTP::recipient: unknown option(s) '
+		. join(" ", keys %opt)
+		. ' - ignored'
+	if scalar keys %opt;
+    }
+   else
+    {
+     carp 'Net::SMTP::mail: ESMTP not supported by host - options discarded :-(';
+    }
+  }
+
+ $me->_MAIL("FROM:".$addr.$opts);
+}
+
 sub send	  { shift->_SEND("FROM:" . _addr($_[0])) }
 sub send_or_mail  { shift->_SOML("FROM:" . _addr($_[0])) }
 sub send_and_mail { shift->_SAML("FROM:" . _addr($_[0])) }
@@ -296,11 +416,45 @@ sub recipient
 {
  my $smtp = shift;
  my $ok = 1;
+ my $opts = "";
+
+ if(@_ && ref($_[-1]))
+  {
+   my %opt = %{pop(@_)};
+   my $v;
+
+   if(exists ${*$smtp}{'net_smtp_esmtp'})
+    {
+     my $esmtp = ${*$smtp}{'net_smtp_esmtp'};
+
+     if(defined($v = delete $opt{Notify}))
+      {
+       if(exists $esmtp->{DSN})
+        {
+	 $opts .= " NOTIFY=" . join(",",map { uc $_ } @$v)
+        }
+       else
+        {
+	 carp 'Net::SMTP::recipient: DSN option not supported by host';
+        }
+      }
+
+     carp 'Net::SMTP::recipient: unknown option(s) '
+		. join(" ", keys %opt)
+		. ' - ignored'
+	if scalar keys %opt;
+    }
+   else
+    {
+     carp 'Net::SMTP::recipient: ESMTP not supported by host - options discarded :-(';
+    }
+  }
 
  while($ok && scalar(@_))
   {
-   $ok = $smtp->_RCPT("TO:" . _addr(shift));
+   $ok = $smtp->_RCPT("TO:" . _addr(shift) . $opts);
   }
+
  return $ok;
 }
 
@@ -312,20 +466,16 @@ sub data
 
  my $ok = $me->_DATA() && $me->datasend(@_);
 
- return $ok
-	unless($ok && @_);
-
- $me->dataend;
+ $ok && @_ ? $me->dataend
+	   : $ok;
 }
 
 sub expand
 {
  my $me = shift;
 
- my @r = $me->_EXPN(@_)  ? @{*$me}
-			: ();
-
- return @r;
+ $me->_EXPN(@_) ? ($me->message)
+		: ();
 }
 
 
@@ -335,8 +485,8 @@ sub help
 {
  my $me = shift;
 
- return $me->_HELP(@_) ? $me->message
-		      : undef;
+ $me->_HELP(@_) ? scalar $me->message
+	        : undef;
 }
 
 sub close
@@ -356,6 +506,7 @@ sub quit    { shift->close }
 ## RFC821 commands
 ##
 
+sub _EHLO { shift->command("EHLO", @_)->response()  == CMD_OK }   
 sub _HELO { shift->command("HELO", @_)->response()  == CMD_OK }   
 sub _MAIL { shift->command("MAIL", @_)->response()  == CMD_OK }   
 sub _RCPT { shift->command("RCPT", @_)->response()  == CMD_OK }   

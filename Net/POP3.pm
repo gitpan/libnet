@@ -141,7 +141,14 @@ Graham Barr <Graham.Barr@tiuk.ti.com>
 
 =head1 REVISION
 
-$Revision: 2.0 $
+$Revision: 2.1 $
+$Date: 1996/07/26 06:44:44 $
+
+The VERSION is derived from the revision by changing each number after the
+first dot into a 2 digit number so
+
+	Revision 1.8   => VERSION 1.08
+	Revision 1.2.3 => VERSION 1.0203
 
 =head1 COPYRIGHT
 
@@ -157,8 +164,9 @@ use vars qw(@ISA $VERSION $debug);
 use Net::Cmd;
 use Carp;
 
-$VERSION = sprintf("%d.%02d", q$Revision: 2.0 $ =~ /(\d+)\.(\d+)/);
+$VERSION = do{my @r=(q$Revision: 2.1 $=~/(\d+)/g);sprintf "%d."."%02d"x$#r,@r};
 
+@ISA = qw(Net::Cmd IO::Socket::INET);
 
 sub new
 {
@@ -166,13 +174,13 @@ sub new
  my $type = ref($self) || $self;
  my $host = shift;
  my %arg  = @_; 
- my $obj = $type->_SUPER::new(PeerAddr => $host, 
+ my $obj = $type->SUPER::new(PeerAddr => $host, 
 			     PeerPort => $arg{Port} || 'pop3(110)',
 			     Proto    => 'tcp',
-			     Timeout  => $arg{Timeout} || 120
-			    );
- return undef
-    unless $obj;
+			     Timeout  => defined $arg{Timeout}
+						? $arg{Timeout}
+						: 120
+			    ) or return undef;
 
  ${*$obj}{'net_pop3_host'} = $host;
 

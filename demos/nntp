@@ -12,9 +12,9 @@ GetOptions(qw(debug));
 
 $nntp = Net::NNTP->new('news', Debug => $opt_debug ? 1 : 0);
 
-if($subs = $nntp->subscriptions)
+if($subs = $nntp->newsgroups)
  {
-  print join("\n",keys %$subs),"\n";
+  print join("\n",(keys %$subs)[0 .. 10]),"\n";
  }
  else
  {

@@ -26,17 +26,19 @@ in RFC977. C<Net::NNTP> inherits its communication methods from C<Net::Cmd>
 
 =over 4
 
-=item new ( [ HOST [, OPTIONS ]])
+=item new ( [ HOST ] [, OPTIONS ])
 
 This is the constructor for a new Net::NNTP object. C<HOST> is the
 name of the remote host to which a NNTP connection is required. If not
-given the C<news> is used.
+given two environment variables are checked, first C<NNTPSERVER> then
+C<NEWSHOST>, if neither are set C<news> is used.
 
 C<OPTIONS> are passed in a hash like fasion, using key and value pairs.
 Possible options are:
 
 B<Timeout> - Maximum time, in seconds, to wait for a response from the
-NNTP server (default: 120)
+NNTP server, a value of zero will cause all IO operations to block.
+(default: 120)
 
 B<Debug> - Enable the printing of debugging information to STDERR
 
@@ -109,7 +111,7 @@ In an array context the return value is a list containing, the number
 of articles in the group, the number of the first article, the number
 of the last article and the group name.
 
-=item ihave ( MSGID [, MESSAGE])
+=item ihave ( MSGID [, MESSAGE ])
 
 The C<ihave> command informs the server that the client has an article
 whose id is C<MSGID>.  If the server desires a copy of that
@@ -146,8 +148,8 @@ that it will allow posting.
 
 Obtain information about all the active newsgroups. The results is a reference
 to a hash where the key is a group name and each value is a reference to an
-array which contains the first article number in the group, the last article
-number in the group and any informations flags about the group.
+array. The elements in this array are:- the first article number in the group,
+the last article number in the group and any information flags about the group.
 
 =item newgroups ( SINCE [, DISTRIBUTIONS ])
 
@@ -262,9 +264,25 @@ message.
 The result is the same as C<xhdr> except the is will be restricted to
 headers that match C<PATTERN>
 
+=item xrover
+
+=item listgroup
+
+=item reader
+
 =back
 
-=head1 DEFINITION
+=head1 UNSUPPORTED
+
+The following NNTP command are unsupported by the package, and there are
+no plans to do so.
+
+    AUTHINFO GENERIC
+    XTHREAD
+    XSEARCH
+    XINDEX
+
+=head1 DEFINITIONS
 
 =over 4
 
@@ -276,6 +294,73 @@ two message numbers.
 If C<MESSAGE-RANGE> is two message numbers and the second number in a
 range is less than or equal to the first then the range represents all
 messages in the group after the first message number.
+
+=item PATTERN
+
+The C<NNTP> protocol uses the C<WILDMAT> format for patterns.
+The WILDMAT format was first developed by Rich Salz based on
+the format used in the UNIX "find" command to articulate
+file names. It was developed to provide a uniform mechanism
+for matching patterns in the same manner that the UNIX shell
+matches filenames.
+
+Patterns are implicitly anchored at the
+beginning and end of each string when testing for a match.
+
+There are five pattern matching operations other than a strict
+one-to-one match between the pattern and the source to be
+checked for a match.
+
+The first is an asterisk C<*> to match any sequence of zero or more
+characters.
+
+The second is a question mark C<?> to match any single character. The
+third specifies a specific set of characters.
+
+The set is specified as a list of characters, or as a range of characters
+where the beginning and end of the range are separated by a minus (or dash)
+character, or as any combination of lists and ranges. The dash can
+also be included in the set as a character it if is the beginning
+or end of the set. This set is enclosed in square brackets. The
+close square bracket C<]> may be used in a set if it is the first
+character in the set.
+
+The fourth operation is the same as the
+logical not of the third operation and is specified the same
+way as the third with the addition of a caret character C<^> at
+the beginning of the test string just inside the open square
+bracket.
+
+The final operation uses the backslash character to
+invalidate the special meaning of the a open square bracket C<[>,
+the asterisk, backslash or the question mark. Two backslashes in
+sequence will result in the evaluation of the backslash as a
+character with no special meaning.
+
+=over 4
+
+=item Examples
+
+=item C<[^]-]>
+
+matches any single character other than a close square
+bracket or a minus sign/dash.
+
+=item C<*bdc>
+
+matches any string that ends with the string "bdc"
+including the string "bdc" (without quotes).
+
+=item C<[0-9a-zA-Z]>
+
+matches any single printable alphanumeric ASCII character.
+
+=item C<a??d>
+
+matches any four character string which begins
+with a and ends with d.
+
+=back
 
 =back
 
@@ -289,7 +374,7 @@ Graham Barr <Graham.Barr@tiuk.ti.com>
 
 =head1 REVISION
 
-$Revision: 2.0 $
+$Revision: 2.5 $
 
 =head1 COPYRIGHT
 
@@ -305,22 +390,25 @@ use IO::Socket;
 use Net::Cmd;
 use Carp;
 
-$VERSION = sprintf("%d.%02d", q$Revision: 2.0 $ =~ /(\d+)\.(\d+)/);
+$VERSION = sprintf("%d.%02d", q$Revision: 2.5 $ =~ /(\d+)\.(\d+)/);
 @ISA     = qw(Net::Cmd IO::Socket::INET);
 
 sub new
 {
  my $self = shift;
  my $type = ref($self) || $self;
- my $host = shift || "news";
- my %arg  = @_; 
+ my $host = shift if @_ % 2;
+ my %arg  = @_;
+
+ $host ||= $ENV{NNTPSERVER} || $ENV{NEWSHOST} || "news";
+
  my $obj = $type->SUPER::new(PeerAddr => $host, 
 			     PeerPort => $arg{Port} || 'nntp(119)',
 			     Proto    => 'tcp',
-			     Timeout  => $arg{Timeout} || 120
-			    );
- return undef
-    unless $obj;
+			     Timeout  => defined $arg{Timeout}
+						? $arg{Timeout}
+						: 120
+			    ) or return undef;
 
  ${*$obj}{'net_nntp_host'} = $host;
 
@@ -339,8 +427,24 @@ sub new
  $obj;
 }
 
+sub debug_text
+{
+ my $nntp = shift;
+ my $inout = shift;
+ my $text = shift;
+
+ if(($nntp->code == 350 && $text =~ /^(\S+)/)
+    || ($text =~ /^(authinfo\s+pass)/io)) 
+  {
+   $text = "$1 ....\n"
+  }
+
+ $text;
+}
+
 sub postok
 {
+ @_ == 1 or croak 'usage: $nntp->postok()';
  my $nntp = shift;
  ${*$nntp}{'net_nntp_post'} || 0;
 }
@@ -364,9 +468,18 @@ sub authinfo
     && $nntp->_AUTHINFO("PASS",$pass) == CMD_OK;
 }
 
+sub authinfo_simple
+{
+ @_ == 3 or croak 'usage: $nntp->authinfo( USER, PASS )';
+ my($nntp,$user,$pass) = @_;
+
+ $nntp->_AUTHINFO('SIMPLE') == CMD_MORE 
+    && $nntp->command($user,$pass)->response == CMD_OK;
+}
+
 sub body
 {
- @_ == 1 || @_ == 2 or croak 'usage: $nntp->body( MSGID )';
+ @_ == 1 || @_ == 2 or croak 'usage: $nntp->body( [ MSGID ] )';
  my $nntp = shift;
 
  $nntp->_BODY(@_)
@@ -376,7 +489,7 @@ sub body
 
 sub head
 {
- @_ == 1 || @_ == 2 or croak 'usage: $nntp->head( MSGID )';
+ @_ == 1 || @_ == 2 or croak 'usage: $nntp->head( [ MSGID ] )';
  my $nntp = shift;
 
  $nntp->_HEAD(@_)
@@ -386,7 +499,7 @@ sub head
 
 sub nntpstat
 {
-# @_ == 1 || @_ == 2 or croak 'usage: $nntp->nntpstat( MSGID )';
+ @_ == 1 || @_ == 2 or croak 'usage: $nntp->nntpstat( [ MSGID ] )';
  my $nntp = shift;
 
  $nntp->_STAT(@_) && $nntp->message =~ /(<[^>]+>)/o
@@ -394,31 +507,21 @@ sub nntpstat
     : undef;
 }
 
-sub date
-{
- @_ == 1 or croak 'usage: $nntp->date';
- my $nntp = shift;
-
- $nntp->_DATE && $nntp->message =~ /(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)/
-    ? timegm($6,$5,$4,$3,$2-1,$1)
-    : undef;
-}
-
 
 sub group
 {
- @_ == 1 || @_ == 2 or croak 'usage: $nntp->group( [GROUP ] )';
+ @_ == 1 || @_ == 2 or croak 'usage: $nntp->group( [ GROUP ] )';
  my $nntp = shift;
  my $grp = ${*$nntp}{'net_nntp_group'} || undef;
 
  return $grp
     unless(@_ || wantarray);
 
- my $ok = @_ ? $nntp->_GROUP($_[0])
-             : $nntp->_LISTGROUP;
+ my $newgrp = shift;
 
- $ok && $nntp->message =~ /(\d+)\s+(\d+)\s+(\d+)\s+(\S+)/ or
-    return wantarray ? () : undef;
+ return wantarray ? () : undef
+	unless $nntp->_GROUP($newgrp || $grp || "")
+		&& $nntp->message =~ /(\d+)\s+(\d+)\s+(\d+)\s+(\S+)/;
 
  my($count,$first,$last,$group) = ($1,$2,$3,$4);
 
@@ -428,14 +531,14 @@ sub group
 
  ${*$nntp}{'net_nntp_group'} = $group;
 
- wantarray ? ($count,$first,$last,$group)
-           : $group;
+ wantarray
+    ? ($count,$first,$last,$group)
+    : $group;
 }
 
 sub help
 {
  @_ == 1 or croak 'usage: $nntp->help()';
-
  my $nntp = shift;
 
  $nntp->_HELP
@@ -449,20 +552,17 @@ sub ihave
  my $nntp = shift;
  my $mid = shift;
 
- my $ok = $nntp->_IHAVE($mid) && $nntp->datasend(@_);
-
- return $ok
-    unless($ok && @_);
-
- $nntp->dataend;
+ $nntp->_IHAVE($mid) && $nntp->datasend(@_)
+    ? @_ == 0 || $nntp->dataend
+    : undef;
 }
 
 sub last
 {
  @_ == 1 or croak 'usage: $nntp->last()';
- my $me = shift;
+ my $nntp = shift;
 
- $me->_LAST && $me->message =~ /(<[^>]+>)/o
+ $nntp->_LAST && $nntp->message =~ /(<[^>]+>)/o
     ? $1
     : undef;
 }
@@ -515,9 +615,9 @@ sub newnews
 sub next
 {
  @_ == 1 or croak 'usage: $nntp->next()';
- my $me = shift;
+ my $nntp = shift;
 
- $me->_NEXT && $me->message =~ /(<[^>]+>)/o
+ $nntp->_NEXT && $nntp->message =~ /(<[^>]+>)/o
     ? $1
     : undef;
 }
@@ -526,16 +626,15 @@ sub post
 {
  @_ >= 1 or croak 'usage: $nntp->post( [ MESSAGE ] )';
  my $nntp = shift;
- my $ok = $nntp->_POST() && $nntp->datasend(@_);
 
- return $ok
-    unless($ok && @_);
-
- $nntp->dataend;
+ $nntp->_POST() && $nntp->datasend(@_)
+    ? @_ == 0 || $nntp->dataend
+    : undef;
 }
 
 sub quit
 {
+ @_ == 1 or croak 'usage: $nntp->quit()';
  my $nntp = shift;
 
  $nntp->_QUIT && $nntp->SUPER::close;
@@ -543,8 +642,57 @@ sub quit
 
 sub slave
 {
- @_ == 1 or croak 'usage: $nntp->slave';
- $_[0]->_SLAVE;
+ @_ == 1 or croak 'usage: $nntp->slave()';
+ my $nntp = shift;
+
+ $nntp->_SLAVE;
+}
+
+##
+## The following methods are not implemented by all servers
+##
+
+sub active
+{
+ @_ == 1 || @_ == 2 or croak 'usage: $nntp->active( [ PATTERN ] )';
+ my $nntp = shift;
+
+ $nntp->_LIST('ACTIVE',@_)
+    ? $nntp->_grouplist
+    : undef;
+}
+
+sub active_times
+{
+ @_ == 1 or croak 'usage: $nntp->active_times()';
+ my $nntp = shift;
+
+ $nntp->_LIST('ACTIVE.TIMES')
+    ? $nntp->_grouplist
+    : undef;
+}
+
+sub distributions
+{
+ @_ == 1 or croak 'usage: $nntp->distributions()';
+ my $nntp = shift;
+
+ $nntp->_LIST('DISTRIBUTIONS')
+    ? $nntp->_description
+    : undef;
+}
+
+sub distribution_patterns
+{
+ @_ == 1 or croak 'usage: $nntp->distributions()';
+ my $nntp = shift;
+
+ my $arr;
+ local $_;
+
+ $nntp->_LIST('DISTRIB.PATS') && ($arr = $nntp->read_until_dot)
+    ? [grep { /^\d/ && (chomp, $_ = [ split /:/ ]) } @$arr]
+    : undef;
 }
 
 sub newsgroups
@@ -557,30 +705,9 @@ sub newsgroups
     : undef;
 }
 
-
-sub distributions
-{
- @_ == 1 or croak 'usage: $nntp->distributions';
- my $nntp = shift;
-
- $nntp->_LIST('DISTRIBUTIONS')
-    ? $nntp->_description
-    : undef;
-}
-
-sub subscriptions
-{
- @_ == 1 or croak 'usage: $nntp->subscriptions';
- my $nntp = shift;
-
- $nntp->_LIST('SUBSCRIPTIONS')
-    ? $nntp->_articlelist
-    : undef;
-}
-
 sub overview_fmt
 {
- @_ == 1 or croak 'usage: $nntp->overview_fmt';
+ @_ == 1 or croak 'usage: $nntp->overview_fmt()';
  my $nntp = shift;
 
  $nntp->_LIST('OVERVIEW.FMT')
@@ -588,37 +715,40 @@ sub overview_fmt
      : undef;
 }
 
-sub active_times
+sub subscriptions
 {
- @_ == 1 or croak 'usage: $nntp->active_times';
+ @_ == 1 or croak 'usage: $nntp->subscriptions()';
  my $nntp = shift;
 
- $nntp->_LIST('ACTIVE.TIMES')
-    ? $nntp->_grouplist
+ $nntp->_LIST('SUBSCRIPTIONS')
+    ? $nntp->_articlelist
     : undef;
 }
 
-sub active
+sub listgroup
 {
- @_ == 1 || @_ == 2 or croak 'usage: $nntp->active( [ PATTERN ] )';
+ @_ == 1 || @_ == 2 or croak 'usage: $nntp->listgroup( [ GROUP ] )';
  my $nntp = shift;
 
- $nntp->_LIST('ACTIVE',@_)
-    ? $nntp->_grouplist
+ $nntp->_LISTGROUP(@_)
+    ? $nntp->_articlelist
     : undef;
 }
 
+sub reader
+{
+ @_ == 1 or croak 'usage: $nntp->reader()';
+ my $nntp = shift;
 
-##
-## eXtension commands
-##
+ $nntp->_MODE('READER');
+}
 
 sub xgtitle
 {
- @_ == 2 or croak 'usage: $nntp->xgtitle( PATTERN )';
- my($nntp,$pat) = @_;
+ @_ == 1 || @_ == 2 or croak 'usage: $nntp->xgtitle( [ PATTERN ] )';
+ my $nntp = shift;
 
- $nntp->_XGTITLE($pat)
+ $nntp->_XGTITLE(@_)
     ? $nntp->_description
     : undef;
 }
@@ -626,35 +756,37 @@ sub xgtitle
 sub xhdr
 {
  @_ >= 2 && @_ <= 4 or croak 'usage: $nntp->xhdr( HEADER, [ MESSAGE-ID | MESSAGE_NUM [, MESSAGE-NUM ]] )';
- my $nntp = shift;
- my $header = shift;
+ my($nntp,$hdr,$first) = splice(@_,0,3);
 
- my $arg = "$_[0]";
+ my $arg = "$first";
 
  if(@_)
   {
+   my $last = shift;
+
    $arg .= "-";
-   $arg .= "$_[1]"
-    if($_[1] > $_[0]);
+   $arg .= "$last"
+	if(defined $last && $last > $first);
   }
 
- $nntp->_XHDR($header, $arg)
+ $nntp->_XHDR($hdr, $arg)
     ? $nntp->_description
     : undef;
 }
 
 sub xover
 {
- @_ == 2 || @_ == 3 or croak 'usage: $nntp->xover( GROUP )';
- my $nntp = shift;
+ @_ == 2 || @_ == 3 or croak 'usage: $nntp->xover( RANGE )';
+ my($nntp,$first) = splice(@_,0,2);
 
- my $arg = "$_[0]";
+ my $arg = "$first";
 
  if(@_)
   {
+   my $last = shift;
    $arg .= "-";
-   $arg .= "$_[1]"
-    if($_[1] > $_[0]);
+   $arg .= "$last"
+	if(defined $last && $last > $first);
   }
 
  $nntp->_XOVER($arg)
@@ -662,43 +794,73 @@ sub xover
     : undef;
 }
 
-sub xpath
-{
- @_ == 2 or croak 'usage: $nntp->xpath( MESSAGE-ID )';
- my($nntp,$mid) = @_;
- $nntp->_XPATH($mid) && $nntp->message =~ /^\d+\s+(\S+)/o
-    ? $1
-    : undef;
-}
-
 sub xpat
 {
- @_ == 4 || @_ == 5 or croak '$nntp->xpat( HEADER, PATTERN, RANGE)';
+ @_ == 4 || @_ == 5 or croak '$nntp->xpat( HEADER, PATTERN, RANGE )';
+ my($nntp,$hdr,$pat,$first) = splice(@_,0,4);
 
- my $nntp = shift;
- my $header = shift;
- my $pattern = shift;
-
- my $arg = "$_[0]";
+ my $arg = "$first";
 
  if(@_)
   {
+   my $last = shift;
    $arg .= "-";
-   $arg .= "$_[1]"
-    if($_[1] > $_[0]);
+   $arg .= "$last"
+	if(defined $last && $last > $first);
   }
 
- $nntp->_XPAT($header,$arg,$pattern)
+ $pat = join(" ", @$pat)
+    if ref($pat);
+
+ $nntp->_XPAT($hdr,$arg,$pat)
     ? $nntp->_description
     : undef;
 }
 
-# others I have heard of are
-#   xthread
-#   xsearch
-#   xindex
-# but my local news server does not support these so I do not know
-# how they work
+sub xpath
+{
+ @_ == 2 or croak 'usage: $nntp->xpath( MESSAGE-ID )';
+ my($nntp,$mid) = @_;
+
+ return undef
+	unless $nntp->_XPATH($mid);
+
+ my $m; ($m = $nntp->message) =~ s/^\d+\s+//o;
+ my @p = split /\s+/, $m;
+
+ wantarray ? @p : $p[0];
+}
+
+sub xrover
+{
+ @_ == 2 || @_ == 3 or croak 'usage: $nntp->xrover( RANGE )';
+ my($nntp,$first) = splice(@_,0,2);
+
+ my $arg = "$first";
+
+ if(@_)
+  {
+   my $last = shift;
+
+   $arg .= "-";
+   $arg .= "$last"
+	if(defined $last && $last > $first);
+  }
+
+ $nntp->_XROVER($arg)
+    ? $nntp->_fieldlist
+    : undef;
+}
+
+sub date
+{
+ @_ == 1 or croak 'usage: $nntp->date()';
+ my $nntp = shift;
+
+ $nntp->_DATE && $nntp->message =~ /(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)/
+    ? timegm($6,$5,$4,$3,$2-1,$1)
+    : undef;
+}
 
 
 ##
@@ -726,7 +888,7 @@ sub _grouplist
  foreach $ln (@$arr)
   {
    my @a = split(/[\s\n]+/,$ln);
-   $hash->{$a[0]} = @a[1,2,3];
+   $hash->{$a[0]} = [ @a[1,2,3] ];
   }
 
  $hash;
@@ -804,14 +966,16 @@ sub _POST      { shift->command('POST',@_)->response == CMD_OK }
 sub _QUIT      { shift->command('QUIT',@_)->response == CMD_OK }
 sub _SLAVE     { shift->command('SLAVE',@_)->response == CMD_OK }
 sub _STAT      { shift->command('STAT',@_)->response == CMD_OK }
+sub _MODE      { shift->command('MODE',@_)->response == CMD_OK }
 sub _XGTITLE   { shift->command('XGTITLE',@_)->response == CMD_OK }
 sub _XHDR      { shift->command('XHDR',@_)->response == CMD_OK }
-sub _XINDEX    { shift->command('XINDEX',@_)->response == CMD_OK }
 sub _XPAT      { shift->command('XPAT',@_)->response == CMD_OK }
 sub _XPATH     { shift->command('XPATH',@_)->response == CMD_OK }
 sub _XOVER     { shift->command('XOVER',@_)->response == CMD_OK }
+sub _XROVER    { shift->command('XROVER',@_)->response == CMD_OK }
 sub _XTHREAD   { shift->unsupported }
 sub _XSEARCH   { shift->unsupported }
+sub _XINDEX    { shift->unsupported }
 
 ##
 ## IO/perl methods
@@ -819,11 +983,11 @@ sub _XSEARCH   { shift->unsupported }
 
 sub close
 {
- my $me = shift;
+ my $nntp = shift;
 
- ref($me) 
-    && defined fileno($me)
-    && $me->quit;
+ ref($nntp) 
+    && defined fileno($nntp)
+    && $nntp->quit;
 }
 
 sub DESTROY { shift->close }

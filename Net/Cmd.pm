@@ -45,7 +45,7 @@ Returns the text message returned from the last command
 =item code ()
 
 Returns the 3-digit code from the last command. If a command is pending
-then the value 999 is returned
+then the value 0 is returned
 
 =item ok ()
 
@@ -143,7 +143,7 @@ Returns a reference to a list containing the lines, or I<undef> upon failure.
 
 C<Net::Cmd> exports six subroutines, five of these, C<CMD_INFO>, C<CMD_OK>,
 C<CMD_MORE>, C<CMD_REJECT> and C<CMD_ERROR> ,correspond to possible results
-of C<response>. The sixth is C<CMD_PENDING>.
+of C<response> and C<status>. The sixth is C<CMD_PENDING>.
 
 =head1 AUTHOR
 
@@ -151,7 +151,7 @@ Graham Barr <Graham.Barr@tiuk.ti.com>
 
 =head1 REVISION
 
-$Revision: 2.0 $
+$Revision: 2.2 $
 
 =head1 COPYRIGHT
 
@@ -168,7 +168,7 @@ use strict;
 use vars qw(@ISA @EXPORT $VERSION);
 use Carp;
 
-$VERSION = sprintf("%d.%02d", q$Revision: 2.0 $ =~ /(\d+)\.(\d+)/);
+$VERSION = sprintf("%d.%02d", q$Revision: 2.2 $ =~ /(\d+)\.(\d+)/);
 @ISA     = qw(Exporter);
 @EXPORT  = qw(CMD_INFO CMD_OK CMD_MORE CMD_REJECT CMD_ERROR CMD_PENDING);
 
@@ -177,7 +177,7 @@ sub CMD_OK	{ 2 }
 sub CMD_MORE	{ 3 }
 sub CMD_REJECT	{ 4 }
 sub CMD_ERROR	{ 5 }
-sub CMD_PENDING { 9 }
+sub CMD_PENDING { 0 }
 
 my %debug = ();
 
@@ -292,6 +292,17 @@ sub status
  substr(${*$cmd}{'net_cmd_code'},0,1);
 }
 
+sub set_status
+{
+ @_ == 3 or croak 'usage: $obj->set_status( CODE, MESSAGE)';
+
+ my $cmd = shift;
+
+ (${*$cmd}{'net_cmd_code'},${*$cmd}{'net_cmd_resp'}) = @_;
+
+ 1;
+}
+
 sub command
 {
  my $cmd = shift;
@@ -309,7 +320,7 @@ sub command
 	if($cmd->debug);
 
    ${*$cmd}{'net_cmd_resp'} = [];	# the responce
-   ${*$cmd}{'net_cmd_code'} = 999;	# Made this one up :-)
+   ${*$cmd}{'net_cmd_code'} = "000";	# Made this one up :-)
   }
 
  $cmd;
@@ -350,9 +361,9 @@ sub getline
 
  until(scalar(@{${*$cmd}{'net_cmd_lines'}}))
   {
-   my $timeout = $cmd->timeout;
+   my $timeout = $cmd->timeout || undef;
    my $rout;
-   if ($timeout == 0 || select($rout=$rin, undef, undef, $timeout))
+   if (select($rout=$rin, undef, undef, $timeout))
     {
      unless (sysread($cmd, $buf="", 1024))
       {
@@ -364,8 +375,10 @@ sub getline
 
      my @buf = split(/\015?\012/, $buf);	## break into lines
 
-     $partial = (substr($buf, -1, 1) eq "\012") ? ''
-	  				        : pop(@buf); 
+     $partial = length($buf) == 0 || substr($buf, -1, 1) eq "\012"
+		? ''
+	  	: pop(@buf);
+
      map { $_ .= "\n" } @buf;
 
      push(@{${*$cmd}{'net_cmd_lines'}},@buf);

@@ -10,11 +10,11 @@
 $NAME     = 'Net';
 $DISTNAME = "libnet";
 $RELTYPE  = "";
-$VERSION = "1.00";
+$VERSION = "1.01";
 $lib_only = 0;
 
 #--- End Configuration
-
+BEGIN { require 5.002 }
 use ExtUtils::MakeMaker;
 use ExtUtils::Manifest qw(maniread);
 use FileHandle;
@@ -157,6 +157,11 @@ chk_version(IO::Socket => '1.05') or
     warn  "\n"
 	. "*** For Net::Cmd to work you require version 1.05, or later, of\n"
 	. "    IO/Socket.pm from CPAN/modules/by-module/IO/IO-x.x.tar.gz\n\n";
+
+
+#--- Create Net::Config
+
+## system($^X, qw(myConfig -n));
 
 #--- Write the Makefile
 

@@ -1,3 +1,6 @@
+
+*** PLEASE READ THE FILE ``README.DEBUG'' BEFORE POSTING BUG REPORTS ***
+
 This is the README file for the libnet distribution. It combines and replaces
 several of my previous distributions
 
@@ -16,6 +19,7 @@ libnet contains
   Net::Time    (RFC867 & RFC868)
   Net::NNTP    (RFC977)
   Net::POP3    (RFC1939)
+  Net::SNPP    (RFC1861) (not tested)
 
 some possible future packages might be 
 

@@ -128,7 +128,7 @@ Graham Barr <Graham.Barr@tiuk.ti.com>
 
 =head1 REVISION
 
-$Revision: 2.0 $
+$Revision: 2.1 $
 
 =head1 SEE ALSO
 
@@ -148,33 +148,41 @@ use strict;
 use FileHandle;
 use vars qw($VERSION);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 2.0 $ =~ /(\d+)\.(\d+)/);
+$VERSION = sprintf("%d.%02d", q$Revision: 2.1 $ =~ /(\d+)\.(\d+)/);
 
 my %netrc = ();
 
 sub _readrc
 {
  my $host = shift;
- my $file = (getpwuid($>))[7] . "/.netrc";
+
+ # Some OS's don't have `getpwuid', so we default to $ENV{HOME}
+ my $home = eval { (getpwuid($>))[7] } || $ENV{HOME};
+ my $file = $home . "/.netrc";
+
  my($login,$pass,$acct) = (undef,undef,undef);
  my $fh;
  local $_;
 
  $netrc{default} = undef;
 
- my @stat = stat($file);
+ # OS/2 does not handle stat in a way compatable with this check :-(
+ unless($^O eq 'os2')
+  { 
+   my @stat = stat($file);
 
- if(@stat)
-  {
-   if($stat[2] & 077)
+   if(@stat)
     {
-     carp "Bad permissions: $file";
-     return;
-    }
-   if($stat[4] != $<)
-    {
-     carp "Not owner: $file";
-     return;
+     if($stat[2] & 077)
+      {
+       carp "Bad permissions: $file";
+       return;
+      }
+     if($stat[4] != $<)
+      {
+       carp "Not owner: $file";
+       return;
+      }
     }
   }
 

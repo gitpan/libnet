@@ -131,19 +131,24 @@ Returns the full pathname to the new directory.
 
 =item ls ( [ DIR ] )
 
-Get a directory listing of C<DIR>, or the current directory. The result is
-a reference to a list of lines returned from the server.
+Get a directory listing of C<DIR>, or the current directory.
+
+Returns a reference to a list of lines returned from the server.
 
 =item dir ( [ DIR ] )
 
 Get a directory listing of C<DIR>, or the current directory in long format.
-The result is a reference to a list of lines returned from the server.
+
+Returns a reference to a list of lines returned from the server.
 
 =item get ( REMOTE_FILE [, LOCAL_FILE ] )
 
 Get C<REMOTE_FILE> from the server and store locally. C<LOCAL_FILE> may be
 a filename or a filehandle. If not specified the the file will be stored in
 the current directory with the same leafname as the remote file.
+
+Returns C<LOCAL_FILE>, or the generated local file name if C<LOCAL_FILE>
+is not given.
 
 =item put ( LOCAL_FILE [, REMOTE_FILE ] )
 
@@ -152,19 +157,34 @@ If C<LOCAL_FILE> is a filehandle then C<REMOTE_FILE> must be specified. If
 C<REMOTE_FILE> is not specified then the file will be stored in the current
 directory with the same leafname as C<LOCAL_FILE>.
 
+Returns C<REMOTE_FILE>, or the generated remote filename if C<REMOTE_FILE>
+is not given.
+
 =item put_unique ( LOCAL_FILE [, REMOTE_FILE ] )
 
-Same as put but uses the C<STOU> command. Returns the name of the file on
-the server.
+Same as put but uses the C<STOU> command.
+
+Returns the name of the file on the server.
 
 =item append ( LOCAL_FILE [, REMOTE_FILE ] )
 
 Same as put but appends to the file on the remote server.
 
+Returns C<REMOTE_FILE>, or the generated remote filename if C<REMOTE_FILE>
+is not given.
+
 =item unique_name ()
 
 Returns the name of the last file stored on the server using the
 C<STOU> command.
+
+=item mdtm ( FILE )
+
+Returns the I<modification time> of the given file
+
+=item size ( FILE )
+
+Returns the size in bytes for the given file.
 
 =back
 
@@ -321,7 +341,14 @@ Graham Barr <Graham.Barr@tiuk.ti.com>
 
 =head1 REVISION
 
-$Revision: 2.0 $
+$Revision: 2.8 $
+$Date: 1996/09/05 06:53:58 $
+
+The VERSION is derived from the revision by changing each number after the
+first dot into a 2 digit number so
+
+	Revision 1.8   => VERSION 1.08
+	Revision 1.2.3 => VERSION 1.0203
 
 =head1 SEE ALSO
 
@@ -349,11 +376,12 @@ use Carp;
 
 use Socket 1.3;
 use IO::Socket;
+use Time::Local;
 use Net::Cmd;
 use Net::Telnet qw(TELNET_IAC TELNET_IP TELNET_DM);
 
-$VERSION   = sprintf("%d.%02d", q$Revision: 2.0 $ =~ /(\d+)\.(\d+)/);
-@ISA       = qw(Exporter Net::Cmd IO::Socket::INET);
+$VERSION = do{my @r=(q$Revision: 2.8 $=~/(\d+)/g);sprintf "%d."."%02d"x$#r,@r};
+@ISA     = qw(Exporter Net::Cmd IO::Socket::INET);
 
 sub new
 {
@@ -377,11 +405,10 @@ sub new
  my $ftp = $pkg->SUPER::new(PeerAddr => $peer, 
 			    PeerPort => $arg{Port} || 'ftp(21)',
 			    Proto    => 'tcp',
-			    Timeout  => $arg{Timeout} || 120
-			   );
-
- return undef
-    unless $ftp;
+			    Timeout  => defined $arg{Timeout}
+						? $arg{Timeout}
+						: 120
+			   ) or return undef;
 
  ${*$ftp}{'net_ftp_passive'} = $arg{Passive} || 0;  # Always use pasv mode
  ${*$ftp}{'net_ftp_host'}    = $host;               # Remote hostname
@@ -452,6 +479,29 @@ sub quot
  $ftp->response();
 }
 
+sub mdtm
+{
+ my $ftp  = shift;
+ my $file = shift;
+
+ return undef
+ 	unless $ftp->_MDTM($file);
+
+ my @gt = reverse ($ftp->message =~ /(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)/);
+ $gt[5] -= 1;
+ timegm(@gt);
+}
+
+sub size
+{
+ my $ftp  = shift;
+ my $file = shift;
+
+ $ftp->_SIZE($file)
+	? ($ftp->message =~ /(\d+)/)[0]
+	: undef;
+}
+
 sub login
 {
  my($ftp,$user,$pass,$acct) = @_;
@@ -476,6 +526,10 @@ sub login
   }
 
  $ok = $ftp->_USER($user);
+
+ # Some dumb firewall's don't prefix the connection messages
+ $ok = $ftp->response()
+	if($ok == CMD_OK && $ftp->code == 220 && $user =~ /\@/);
 
  if ($ok == CMD_MORE)
   {
@@ -591,6 +645,15 @@ sub get
  ($local = $remote) =~ s#^.*/##
 	unless(defined $local);
 
+ ${*$ftp}{'net_ftp_rest'} = $where
+	if ($where);
+
+ delete ${*$ftp}{'net_ftp_port'};
+ delete ${*$ftp}{'net_ftp_pasv'};
+
+ $data = $ftp->retr($remote) or
+	return undef;
+
  if(defined $localfd)
   {
    $loc = $local;
@@ -602,18 +665,11 @@ sub get
    unless(($where) ? open($loc,">>$local") : open($loc,">$local"))
     {
      carp "Cannot open Local file $local: $!\n";
+     $data->abort;
      return undef;
     }
   }
 
- ${*$ftp}{'net_ftp_rest'} = $where
-	if ($where);
-
- delete ${*$ftp}{'net_ftp_port'};
- delete ${*$ftp}{'net_ftp_pasv'};
-
- $data = $ftp->retr($remote) or
-	return undef;
 
  $buf = '';
 
@@ -626,7 +682,9 @@ sub get
  close($loc)
 	unless defined $localfd;
  
- $data->close() == CMD_OK; # implied $ftp->response
+ $data->close(); # implied $ftp->response
+
+ return $local;
 }
 
 sub cwd
@@ -885,6 +943,7 @@ sub _dataconn
  elsif(defined ${*$ftp}{'net_ftp_listen'})
   {
    $data = ${*$ftp}{'net_ftp_listen'}->accept($pkg);
+   close(delete ${*$ftp}{'net_ftp_listen'});
   }
 
  if($data)
@@ -1076,6 +1135,8 @@ sub _TYPE { shift->command("TYPE",@_)->response() == CMD_OK }
 sub _RNTO { shift->command("RNTO",@_)->response() == CMD_OK }
 sub _ACCT { shift->command("ACCT",@_)->response() == CMD_OK }
 sub _RESP { shift->command("RESP",@_)->response() == CMD_OK }
+sub _MDTM { shift->command("MDTM",@_)->response() == CMD_OK }
+sub _SIZE { shift->command("SIZE",@_)->response() == CMD_OK }
 sub _APPE { shift->command("APPE",@_)->response() == CMD_INFO }
 sub _LIST { shift->command("LIST",@_)->response() == CMD_INFO }
 sub _NLST { shift->command("NLST",@_)->response() == CMD_INFO }
