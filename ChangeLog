@@ -1,3 +1,21 @@
+*** Patch 1.0605
+
+Sun Dec 21 1997 <gbarr@pobox.com> (Graham Barr)
+
+	Net::FTP
+	- Fix for pasv_xfer, previous version hung if an error occured
+	  while setting up the link between the two servers.
+
+Sun Dec 14 1997 <gbarr@pobox.com> (Graham Barr)
+
+	Net::Domain
+	- Fix for 'Use of uninitialized' when setting $SIG{__DIE__}
+
+Sat Dec 13 1997 <gbarr@pobox.com> (Graham Barr)
+
+	Net::Domain, Net::Netrc
+	- patches from Nick Ing-Simmons for MSWin32
+
 *** Patch 1.0604
 
 Thu Dec 11 1997 <gbarr@pobox.com> (Graham Barr)
