@@ -5,7 +5,7 @@
 
 $NAME     = 'Net';
 $DISTNAME = "libnet";
-$VERSION  = "1.14";
+$VERSION  = "1.15";
 
 BEGIN { require 5.002 }
 
@@ -89,6 +89,7 @@ if ($] >= 5.00503) {
 }
 
 WriteMakefile(
+  INSTALLDIRS => ($] >= 5.008 ? 'perl' : 'site'),
   VERSION     => $VERSION,
   DISTNAME    => $DISTNAME,
   NAME        => $NAME,
@@ -99,4 +100,17 @@ WriteMakefile(
 	      },
   @ppd,
 );
+
+sub MY::postamble {
+                                                                                                    
+<<EOS;
+                                                                                                    
+distdir : run_cpansign
+                                                                                                    
+run_cpansign :
+	cpansign -s
+                                                                                                    
+EOS
+                                                                                                    
+}
 
