@@ -1,3 +1,53 @@
+*** Patch 1.0604
+
+Thu Dec 11 1997 <gbarr@pobox.com> (Graham Barr)
+
+	Net::FTP
+	- Removed use of AutoLoader, it was causing problems on
+	  some platforms
+
+Mon Dec  8 1997 <gbarr@pobox.com> (Graham Barr)
+
+	Net::FTP
+	- Fix to pasv_xfer, the command stream on the source side was left
+	  out of sync.
+
+Thu Dec  4 1997 <gbarr@pobox.com> (Graham Barr)
+
+	MANIFEST, FAQ.pod
+	- Added initial FAQ document
+
+	Net::FTP
+	- Set $@ if ->new() fails
+	- fix for pasv_xfer and pasv_xfer_unique name clash with
+	  AutoLoader
+
+Sun Nov 30 1997 <gbarr@pobox.com> (Graham Barr)
+
+	Net::Cmd
+	- Fix for read_until_dot entering an endless loop, now returns undef
+	
+	Net::POP3
+	- Fix ->list() and ->uidl() to handle undef being returned from
+	  ->read_until_dot()
+
+
+	Net::FTP
+	- Fix to login() and authorize() for OS/2 which does not
+	  support getpw*()
+
+Fri Nov 28 1997 <gbarr@pobox.com> (Graham Barr)
+
+	Net::Domain
+	- If user has defined $SIG{__DIE__} then failures inside eval
+	  still call it. local-ized $SIG{__DIE__} to stop this as Net::Domain
+	  used eval to hide such errors.
+
+
+	t/nntp.t
+	- Now exits passing if commands fail due to not having
+	  authorization.
+
 *** Patch 1.0603
 
 Tue Nov 25 1997 <gbarr@pobox.com> (Graham Barr)

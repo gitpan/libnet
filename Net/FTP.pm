@@ -19,9 +19,9 @@ use IO::Socket;
 use Time::Local;
 use Net::Cmd;
 use Net::Config;
-use AutoLoader qw(AUTOLOAD);
+# use AutoLoader qw(AUTOLOAD);
 
-$VERSION = "2.28"; # $Id: //depot/libnet/Net/FTP.pm#12$
+$VERSION = "2.32"; # $Id: //depot/libnet/Net/FTP.pm#17$
 @ISA     = qw(Exporter Net::Cmd IO::Socket::INET);
 
 # Someday I will "use constant", when I am not bothered to much about
@@ -30,9 +30,15 @@ $VERSION = "2.28"; # $Id: //depot/libnet/Net/FTP.pm#12$
 use vars qw($TELNET_IAC $TELNET_IP $TELNET_DM);
 ($TELNET_IAC,$TELNET_IP,$TELNET_DM) = (255,244,242);
 
-1;
+# Name is too long for AutoLoad, it clashes with pasv_xfer
+sub pasv_xfer_unique {
+    my($sftp,$sfile,$dftp,$dfile) = @_;
+    $sftp->pasv_xfer($sfile,$dftp,$dfile,1);
+}
 
-__END__
+1;
+# Having problems with AutoLoader
+#__END__
 
 sub new
 {
@@ -88,6 +94,7 @@ sub new
  unless ($ftp->response() == CMD_OK)
   {
    $ftp->close();
+   $@ = $ftp->message;
    undef $ftp;
   }
 
@@ -198,7 +205,7 @@ sub login
      ($ruser,$pass,$acct) = $rc->lpa()
 	if ($rc);
 
-     $pass = "-" . (getpwuid($>))[0] . "@" 
+     $pass = eval { "-" . (getpwuid($>))[0] . "@" }
         if (!defined $pass && (!defined($ruser) || $ruser =~ /^anonymous/o));
     }
 
@@ -232,7 +239,7 @@ sub authorize
   {
    require Net::Netrc;
 
-   $auth ||= (getpwuid($>))[0];
+   $auth ||= eval { (getpwuid($>))[0] };
 
    my $rc = Net::Netrc->lookup(${*$ftp}{'net_ftp_firewall'}, $auth)
         || Net::Netrc->lookup(${*$ftp}{'net_ftp_firewall'});
@@ -803,7 +810,7 @@ sub parse_response
 
 sub pasv_xfer
 {
- my($sftp,$sfile,$dftp,$dfile) = @_;
+ my($sftp,$sfile,$dftp,$dfile,$unique) = @_;
 
  ($dfile = $sfile) =~ s#.*/##
     unless(defined $dfile);
@@ -811,27 +818,9 @@ sub pasv_xfer
  my $port = $sftp->pasv or
     return undef;
 
- unless($dftp->port($port) && $sftp->retr($sfile) && $dftp->stor($dfile))
-  {
-   $sftp->abort;
-   $dftp->abort;
-   return undef;
-  }
-
- $dftp->pasv_wait($sftp);
-}
-
-sub pasv_xfer_unique
-{
- my($sftp,$sfile,$dftp,$dfile) = @_;
-
- ($dfile = $sfile) =~ s#.*/##
-    unless(defined $dfile);
-
- my $port = $sftp->pasv or
-    return undef;
-
- unless($dftp->port($port) && $sftp->retr($sfile) && $dftp->stou($dfile))
+ unless($dftp->port($port) && $sftp->retr($sfile) &&
+        ($unique ? $dftp->stou($dfile) : $dftp->stor($dfile)) &&
+	$sftp->response() == CMD_INFO)
   {
    $sftp->abort;
    $dftp->abort;
@@ -995,6 +984,9 @@ B<Passive> - If set to I<true> then all data transfers will be done using
 passive mode. This is required for some I<dumb> servers, and some
 firewall configurations.  This can also be set by the environment
 variable C<FTP_PASSIVE>.
+
+If the constructor fails undef will be returned and an error message will
+be in $@
 
 =back
 
