@@ -126,10 +126,6 @@ Return a list of login, password and account information fir the netrc entry
 
 Graham Barr <Graham.Barr@tiuk.ti.com>
 
-=head1 REVISION
-
-$Revision: 2.1 $
-
 =head1 SEE ALSO
 
 L<Net::Netrc>
@@ -148,7 +144,7 @@ use strict;
 use FileHandle;
 use vars qw($VERSION);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 2.1 $ =~ /(\d+)\.(\d+)/);
+$VERSION = "2.03";
 
 my %netrc = ();
 
@@ -274,7 +270,7 @@ sub lookup
    return $netrc{$mach}->[0]
   }
 
- return $netrc{default}
+ return $netrc{default}->[0]
     if defined $netrc{default};
 
  return undef;

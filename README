@@ -1,6 +1,8 @@
 
 *** PLEASE READ THE FILE ``README.DEBUG'' BEFORE POSTING BUG REPORTS ***
 
+Read INSTALL for instructions on how to configure and install the distribution
+
 This is the README file for the libnet distribution. It combines and replaces
 several of my previous distributions
 
@@ -20,6 +22,8 @@ libnet contains
   Net::NNTP    (RFC977)
   Net::POP3    (RFC1939)
   Net::SNPP    (RFC1861) (not tested)
+  Net::PH
+  Net::Config
 
 some possible future packages might be 
 
@@ -38,28 +42,6 @@ with 5.001
 See ChangeLog for recent changes. POD style documentation is included in
 all/most modules and scripts. You should be able to use the 'perldoc'
 utility to extract documentation from these files.
-
-Before building this extension you will require the following modules. The 
-building of the Makefile will abort if you do not have the required versions.
-All of these modules should be avaliable from CPAN (see README.CPAN for 
-more information)
-
-   IO     v1.05
-   Socket v1.03
-
-You install the library by running these commands:
-
-   perl Makefile.PL
-   make
-   make test
-   make install
-
-You can edit the configuration section of Makefile.PL to select which
-programs to install in addition to the library itself.  If you don't
-want to install any programs at all then make the initial Makefile with:
-
-   perl Makefile.PL -l
-
 
 Hostname.pm.eg is an example module that can be use in place of Sys::Hostname
 it will cause Sys::Hostname to use Net::Domain and if used in a perl -w

@@ -42,10 +42,6 @@ Returns the remainder of the FQDN after the I<hostname> has been removed.
 Graham Barr <bodg@tiuk.ti.com>.
 Adapted from Sys::Hostname by David Sundstrom <sunds@asictest.sc.ti.com>
 
-=head1 REVISION
-
-$Revision: 2.0 $
-
 =head1 COPYRIGHT
 
 Copyright (c) 1995 Graham Barr. All rights reserved.
@@ -63,7 +59,7 @@ use vars qw($VERSION @ISA @EXPORT_OK);
 @ISA = qw(Exporter);
 @EXPORT_OK = qw(hostname hostdomain hostfqdn domainname);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 2.0 $ =~ /(\d+)\.(\d+)/);
+$VERSION = "2.01";
 
 my($host,$domain,$fqdn) = (undef,undef,undef);
 

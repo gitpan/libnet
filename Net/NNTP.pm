@@ -241,30 +241,40 @@ C<PATTERN> can be a group pattern.
 Returns a reference to a hash where the keys are all the group names which
 match C<PATTERN> and each value is the description text for the group.
 
-=item xhdr ( HEADER, MESSAGE-RANGE )
+=item xhdr ( HEADER, MESSAGE-SPEC )
 
 Obtain the header field C<HEADER> for all the messages specified. 
 
-Returns a reference to a hash where the keys are the message numbers and
-each value contains the header for that message.
+The return value will be a reference
+to a hash where the keys are the message numbers and each value contains
+the text of the requested header for that message.
 
-=item xover ( MESSAGE-RANGE )
+=item xover ( MESSAGE-SPEC )
 
-Returns a reference to a hash where the keys are the message numbers and each
-value is a reference to an array which contains the overview fields for that
-message. The names of these fields can be obtained by calling C<overview_fmt>.
+The return value will be a reference
+to a hash where the keys are the message numbers and each value contains
+a reference to an array which contains the overview fields for that
+message.
+
+The names of the fields can be obtained by calling C<overview_fmt>.
 
 =item xpath ( MESSAGE-ID )
 
 Returns the path name to the file on the server which contains the specified
 message.
 
-=item xpat ( HEADER, PATTERN, MESSAGE-RANGE)
+=item xpat ( HEADER, PATTERN, MESSAGE-SPEC)
 
 The result is the same as C<xhdr> except the is will be restricted to
-headers that match C<PATTERN>
+headers where the text of the header matches C<PATTERN>
 
 =item xrover
+
+The XROVER command returns reference information for the article(s)
+specified.
+
+Returns a reference to a HASH where the keys are the message numbers and the
+values are the References: lines from the articles
 
 =item listgroup
 
@@ -286,14 +296,18 @@ no plans to do so.
 
 =over 4
 
-=item MESSAGE-RANGE
+=item MESSAGE-SPEC
 
-C<MESSAGE-RANGE> is either a single message-id, a single mesage number, or
-two message numbers.
+C<MESSAGE-SPEC> is either a single message-id, a single message number, or
+a reference to a list of two message numbers.
 
-If C<MESSAGE-RANGE> is two message numbers and the second number in a
-range is less than or equal to the first then the range represents all
-messages in the group after the first message number.
+If C<MESSAGE-SPEC> is a reference to a list of two message numbers and the
+second number in a range is less than or equal to the first then the range
+represents all messages in the group after the first message number.
+
+B<NOTE> For compatability reasons only with earlier versions of Net::NNTP
+a message spec can be passed as a list of two numbers, this is depriciated
+an a reference to the list should now be passed
 
 =item PATTERN
 
@@ -372,10 +386,6 @@ L<Net::Cmd>
 
 Graham Barr <Graham.Barr@tiuk.ti.com>
 
-=head1 REVISION
-
-$Revision: 2.5 $
-
 =head1 COPYRIGHT
 
 Copyright (c) 1995 Graham Barr. All rights reserved. This program is free
@@ -390,7 +400,7 @@ use IO::Socket;
 use Net::Cmd;
 use Carp;
 
-$VERSION = sprintf("%d.%02d", q$Revision: 2.5 $ =~ /(\d+)\.(\d+)/);
+$VERSION = "2.08";
 @ISA     = qw(Net::Cmd IO::Socket::INET);
 
 sub new
@@ -755,66 +765,41 @@ sub xgtitle
 
 sub xhdr
 {
- @_ >= 2 && @_ <= 4 or croak 'usage: $nntp->xhdr( HEADER, [ MESSAGE-ID | MESSAGE_NUM [, MESSAGE-NUM ]] )';
- my($nntp,$hdr,$first) = splice(@_,0,3);
-
- my $arg = "$first";
-
- if(@_)
-  {
-   my $last = shift;
-
-   $arg .= "-";
-   $arg .= "$last"
-	if(defined $last && $last > $first);
-  }
+ @_ >= 2 && @_ <= 4 or croak 'usage: $nntp->xhdr( HEADER, [ MESSAGE-SPEC ] )';
+ my $nntp = shift;
+ my $hdr = shift;
+ my $arg = _msg_arg(@_);
 
  $nntp->_XHDR($hdr, $arg)
-    ? $nntp->_description
-    : undef;
+	? $nntp->_description
+	: undef;
 }
 
 sub xover
 {
- @_ == 2 || @_ == 3 or croak 'usage: $nntp->xover( RANGE )';
- my($nntp,$first) = splice(@_,0,2);
-
- my $arg = "$first";
-
- if(@_)
-  {
-   my $last = shift;
-   $arg .= "-";
-   $arg .= "$last"
-	if(defined $last && $last > $first);
-  }
+ @_ == 2 || @_ == 3 or croak 'usage: $nntp->xover( MESSAGE-SPEC )';
+ my $nntp = shift;
+ my $arg = _msg_arg(@_);
 
  $nntp->_XOVER($arg)
-    ? $nntp->_fieldlist
-    : undef;
+	? $nntp->_fieldlist
+	: undef;
 }
 
 sub xpat
 {
- @_ == 4 || @_ == 5 or croak '$nntp->xpat( HEADER, PATTERN, RANGE )';
- my($nntp,$hdr,$pat,$first) = splice(@_,0,4);
-
- my $arg = "$first";
-
- if(@_)
-  {
-   my $last = shift;
-   $arg .= "-";
-   $arg .= "$last"
-	if(defined $last && $last > $first);
-  }
+ @_ == 4 || @_ == 5 or croak '$nntp->xpat( HEADER, PATTERN, MESSAGE-SPEC )';
+ my $nntp = shift;
+ my $hdr = shift;
+ my $pat = shift;
+ my $arg = _msg_arg(@_);
 
  $pat = join(" ", @$pat)
     if ref($pat);
 
  $nntp->_XPAT($hdr,$arg,$pat)
-    ? $nntp->_description
-    : undef;
+	? $nntp->_description
+	: undef;
 }
 
 sub xpath
@@ -833,23 +818,13 @@ sub xpath
 
 sub xrover
 {
- @_ == 2 || @_ == 3 or croak 'usage: $nntp->xrover( RANGE )';
- my($nntp,$first) = splice(@_,0,2);
-
- my $arg = "$first";
-
- if(@_)
-  {
-   my $last = shift;
-
-   $arg .= "-";
-   $arg .= "$last"
-	if(defined $last && $last > $first);
-  }
+ @_ == 2 || @_ == 3 or croak 'usage: $nntp->xrover( MESSAGE-SPEC )';
+ my $nntp = shift;
+ my $arg = _msg_arg(@_);
 
  $nntp->_XROVER($arg)
-    ? $nntp->_fieldlist
-    : undef;
+	? $nntp->_description
+	: undef;
 }
 
 sub date
@@ -866,6 +841,36 @@ sub date
 ##
 ## Private subroutines
 ##
+
+sub _msg_arg
+{
+ my $spec = shift;
+ my $arg = "";
+
+ if(@_)
+  {
+   carp "Depriciated passing of two message numbers, "
+      . "pass a reference"
+	if $^W;
+   $spec = [ $spec, $_[0] ];
+  }
+
+ if(defined $spec)
+  {
+   if(ref($spec))
+    {
+     $arg = $spec->[0] . "-";
+     $arg .= $spec->[1]
+	if defined $spec->[1] && $spec->[1] > $spec->[0];
+    }
+   else
+    {
+     $arg = $spec;
+    }
+  }
+
+ $arg;
+}
 
 sub _timestr
 {
@@ -906,7 +911,8 @@ sub _fieldlist
  foreach $ln (@$arr)
   {
    my @a = split(/[\t\n]/,$ln);
-   $hash->{$a[0]} = @a[1,2,3];
+   my $m = shift @a;
+   $hash->{$m} = [ @a ];
   }
 
  $hash;
@@ -962,7 +968,7 @@ sub _LISTGROUP { shift->command('LISTGROUP',@_)->response == CMD_OK }
 sub _NEWGROUPS { shift->command('NEWGROUPS',@_)->response == CMD_OK }
 sub _NEWNEWS   { shift->command('NEWNEWS',@_)->response == CMD_OK }
 sub _NEXT      { shift->command('NEXT')->response == CMD_OK }
-sub _POST      { shift->command('POST',@_)->response == CMD_OK }
+sub _POST      { shift->command('POST',@_)->response == CMD_MORE }
 sub _QUIT      { shift->command('QUIT',@_)->response == CMD_OK }
 sub _SLAVE     { shift->command('SLAVE',@_)->response == CMD_OK }
 sub _STAT      { shift->command('STAT',@_)->response == CMD_OK }

@@ -110,17 +110,6 @@ RFC1861
 
 Graham Barr <Graham.Barr@tiuk.ti.com>
 
-=head1 REVISION
-
-$Revision: 1.1 $
-$Date: 1996/07/26 06:49:13 $
-
-The VERSION is derived from the revision by changing each number after the
-first dot into a 2 digit number so
-
-	Revision 1.8   => VERSION 1.08
-	Revision 1.2.3 => VERSION 1.0203
-
 =head1 COPYRIGHT
 
 Copyright (c) 1995 Graham Barr. All rights reserved. This program is free
@@ -138,7 +127,7 @@ use Carp;
 use IO::Socket;
 use Net::Cmd;
 
-$VERSION = do{my @r=(q$Revision: 1.1 $=~/(\d+)/g);sprintf "%d."."%02d"x$#r,@r};
+$VERSION = "1.02";
 @ISA     = qw(Net::Cmd IO::Socket::INET);
 @EXPORT  = qw(CMD_2WAYERROR CMD_2WAYOK CMD_2WAYQUEUED);
 
@@ -311,8 +300,8 @@ sub hold
 {
  @_ == 2 || @_ == 3 or croak 'usage: $snpp->hold( TIME [, LOCAL ] )';
  my $me = shift;
- my $until = shift;
- my $local = shift ? "" : " +0000";
+ my $time = shift;
+ my $local = (shift) ? "" : " +0000";
 
  my @g = reverse((gmtime($time))[0..5]);
  $g[1] += 1;

@@ -139,17 +139,6 @@ L<Net::Cmd>
 
 Graham Barr <Graham.Barr@tiuk.ti.com>
 
-=head1 REVISION
-
-$Revision: 2.1 $
-$Date: 1996/07/26 06:44:44 $
-
-The VERSION is derived from the revision by changing each number after the
-first dot into a 2 digit number so
-
-	Revision 1.8   => VERSION 1.08
-	Revision 1.2.3 => VERSION 1.0203
-
 =head1 COPYRIGHT
 
 Copyright (c) 1995 Graham Barr. All rights reserved. This program is free
@@ -164,7 +153,7 @@ use vars qw(@ISA $VERSION $debug);
 use Net::Cmd;
 use Carp;
 
-$VERSION = do{my @r=(q$Revision: 2.1 $=~/(\d+)/g);sprintf "%d."."%02d"x$#r,@r};
+$VERSION = "2.03";
 
 @ISA = qw(Net::Cmd IO::Socket::INET);
 
@@ -208,7 +197,7 @@ sub login
  @_ >= 1 && @_ <= 3 or croak 'usage: $pop3->login( USER, PASS )';
  my($me,$user,$pass) = @_;
 
- if(@_ < 2)
+ if(@_ <= 2)
   {
    require Net::Netrc;
 

@@ -182,17 +182,6 @@ L<Net::Cmd>
 
 Graham Barr <Graham.Barr@tiuk.ti.com>
 
-=head1 REVISION
-
-$Revision: 2.1 $
-$Date: 1996/08/20 20:23:56 $
-
-The VERSION is derived from the revision by changing each number after the
-first dot into a 2 digit number so
-
-	Revision 1.8   => VERSION 1.08
-	Revision 1.2.3 => VERSION 1.0203
-
 =head1 COPYRIGHT
 
 Copyright (c) 1995 Graham Barr. All rights reserved. This program is free
@@ -210,7 +199,7 @@ use Carp;
 use IO::Socket;
 use Net::Cmd;
 
-$VERSION = do{my @r=(q$Revision: 2.1 $=~/(\d+)/g);sprintf "%d."."%02d"x$#r,@r};
+$VERSION = "2.03";
 
 @ISA = qw(Net::Cmd IO::Socket::INET);
 
@@ -458,7 +447,7 @@ sub recipient
  return $ok;
 }
 
-*to = \&recipient;
+sub to { shift->recipient(@_) }
 
 sub data
 {

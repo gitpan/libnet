@@ -3,6 +3,8 @@
 # Copyright (c) 1995 Graham Barr <Graham.Barr@tiuk.ti.com>. All rights
 # reserved. This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl itself.
+#
+# Documentation improved 1996 by Nathan Torkington <gnat@frii.com>.
 
 package Net::FTP;
 
@@ -22,11 +24,38 @@ Net::FTP - FTP Client class
 
 =head1 DESCRIPTION
 
-C<Net::FTP> is a class implementing a simple FTP client in Perl as described
-in RFC959
+C<Net::FTP> is a class implementing a simple FTP client in Perl as
+described in RFC959.  It provides wrappers for a subset of the RFC959
+commands.
 
-C<Net::FTP> provides methods that will perform various operations. These methods
-could be split into groups depending the level of interface the user requires.
+=head1 OVERVIEW
+
+FTP stands for File Transfer Protocol.  It is a way of transferring
+files between networked machines.  The protocol defines a client
+(whose commands are provided by this module) and a server (not
+implemented in this module).  Communication is always initiated by the
+client, and the server responds with a message and a status code (and
+sometimes with data).
+
+The FTP protocol allows files to be sent to or fetched from the
+server.  Each transfer involves a B<local file> (on the client) and a
+B<remote file> (on the server).  In this module, the same file name
+will be used for both local and remote if only one is specified.  This
+means that transferring remote file C</path/to/file> will try to put
+that file in C</path/to/file> locally, unless you specify a local file
+name.
+
+The protocol also defines several standard B<translations> which the
+file can undergo during transfer.  These are ASCII, EBCDIC, binary,
+and byte.  ASCII is the default type, and indicates that the sender of
+files will translate the ends of lines to a standard representation
+which the receiver will then translate back into their local
+representation.  EBCDIC indicates the file being transferred is in
+EBCDIC format.  Binary (also known as image) format sends the data as
+a contiguous bit stream.  Byte format transfers the data as bytes, the
+values of which remain the same regardless of differences in byte size
+between the two machines (in theory - in practice you should only use
+this if you really know what you're doing).
 
 =head1 CONSTRUCTOR
 
@@ -51,7 +80,7 @@ FTP connection
 
 B<Timeout> - Set a timeout value (defaults to 120)
 
-B<Debug> - Debug level
+B<Debug> - debug level (see the debug method in L<Net::Cmd>)
 
 B<Passive> - If set to I<true> then all data transfers will be done using 
 passive mode. This is required for some I<dumb> servers.
@@ -108,7 +137,10 @@ Send a request to the server to delete C<FILENAME>.
 
 =item cwd ( [ DIR ] )
 
-Change the current working directory to C<DIR>, or / if not given.
+Attempt to change directory to the directory given in C<$dir>.  If
+C<$dir> is C<"..">, the FTP C<CDUP> command is used to attempt to
+move up one directory. If no directory is given then an attempt is made
+to change the directory to the root directory.
 
 =item cdup ()
 
@@ -335,36 +367,79 @@ the response from the server was a '2'.
 
 =back
 
+=head1 UNIMPLEMENTED
+
+The following RFC959 commands have not been implemented:
+
+=over 4
+
+=item B<ALLO>
+
+Allocates storage for the file to be transferred.
+
+=item B<SMNT>
+
+Mount a different file system structure without changing login or
+accounting information.
+
+=item B<HELP>
+
+Ask the server for "helpful information" (that's what the RFC says) on
+the commands it accepts.
+
+=item B<MODE>
+
+Specifies transfer mode (stream, block or compressed) for file to be
+transferred.
+
+=item B<SITE>
+
+Request remote server site parameters.
+
+=item B<SYST>
+
+Request remote server system identification.
+
+=item B<STAT>
+
+Request remote server status.
+
+=item B<STRU>
+
+Specifies file structure for file to be transferred.
+
+=item B<REIN>
+
+Reinitialize the connection, flushing all I/O and account information.
+
+=back
+
+
 =head1 AUTHOR
 
 Graham Barr <Graham.Barr@tiuk.ti.com>
-
-=head1 REVISION
-
-$Revision: 2.8 $
-$Date: 1996/09/05 06:53:58 $
-
-The VERSION is derived from the revision by changing each number after the
-first dot into a 2 digit number so
-
-	Revision 1.8   => VERSION 1.08
-	Revision 1.2.3 => VERSION 1.0203
 
 =head1 SEE ALSO
 
 L<Net::Netrc>
 L<Net::Cmd>
 
+ftp(1), ftpd(8), RFC 959
+http://www.cis.ohio-state.edu/htbin/rfc/rfc959.html
+
 =head1 CREDITS
 
 Henry Gabryjelski <henryg@WPI.EDU> - for the suggestion of creating directories
 recursively.
+
+Nathan Torkington <gnat@frii.com> - for some input on the documentation.
 
 =head1 COPYRIGHT
 
 Copyright (c) 1995 Graham Barr. All rights reserved. This program is free
 software; you can redistribute it and/or modify it under the same terms
 as Perl itself.
+
 
 =cut
 
@@ -380,7 +455,7 @@ use Time::Local;
 use Net::Cmd;
 use Net::Telnet qw(TELNET_IAC TELNET_IP TELNET_DM);
 
-$VERSION = do{my @r=(q$Revision: 2.8 $=~/(\d+)/g);sprintf "%d."."%02d"x$#r,@r};
+$VERSION = "2.11";
 @ISA     = qw(Exporter Net::Cmd IO::Socket::INET);
 
 sub new
@@ -439,7 +514,7 @@ sub quit
  my $ftp = shift;
 
  $ftp->_QUIT
-    && $ftp->SUPER::close;
+    && $ftp->close;
 }
 
 sub close
@@ -448,7 +523,7 @@ sub close
 
  ref($ftp) 
     && defined fileno($ftp)
-    && $ftp->quit;
+    && $ftp->SUPER::close;
 }
 
 sub DESTROY { shift->close }
@@ -488,7 +563,8 @@ sub mdtm
  	unless $ftp->_MDTM($file);
 
  my @gt = reverse ($ftp->message =~ /(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)/);
- $gt[5] -= 1;
+ $gt[4] -= 1;
+ $gt[5] %= 100;
  timegm(@gt);
 }
 
@@ -731,7 +807,8 @@ sub mkdir
  $ftp->_MKD($dir) || $recurse or
     return undef;
 
- my $path = undef;
+ my $path = $dir;
+
  unless($ftp->ok)
   {
    my @path = split(m#(?=/+)#, $dir);

@@ -57,16 +57,6 @@ Returns the port number on which the I<DummyInet> object is listening
 
 Graham Barr <Graham.Barr@tiuk.ti.com>
 
-=head1 REVISION
-
-$Revision: 1.2 $
-
-The VERSION is derived from the revision by changing each number after the
-first dot into a 2 digit number so
-
-	Revision 1.8   => VERSION 1.08
-	Revision 1.2.3 => VERSION 1.0203
-
 =head1 COPYRIGHT
 
 Copyright (c) 1995 Graham Barr. All rights reserved. This program is free
@@ -83,7 +73,7 @@ use strict;
 use vars qw($VERSION);
 use Carp;
 
-$VERSION = do{my @r=(q$Revision: 1.2 $=~/(\d+)/g);sprintf "%d."."%02d"x$#r,@r};
+$VERSION = "1.03";
 
 
 sub _process

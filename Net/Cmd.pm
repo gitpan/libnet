@@ -32,8 +32,16 @@ These methods provide a user interface to the C<Net::Cmd> object.
 
 Set the level of debug information for this object. If C<VALUE> is not given
 then the current state is returned. Otherwise the state is changed to 
-C<VALUE> and the previous state returned. If C<VALUE> is C<undef> then
-the debug level will be set to the default debug level for the class.
+C<VALUE> and the previous state returned. 
+
+Set the level of debug information for this object. If no argument is
+given then the current state is returned. Otherwise the state is
+changed to C<$value>and the previous state returned.  Different packages
+may implement different levels of debug but, a  non-zero value result in
+copies of all commands and responses also being sent to STDERR.
+
+If C<VALUE> is C<undef> then the debug level will be set to the default
+debug level for the class.
 
 This method can also be called as a I<static> method to set/get the default
 debug level for a given class.
@@ -60,8 +68,9 @@ is pending then C<CMD_PENDING> is returned.
 
 =item datasend ( DATA )
 
-Send data to the remote server, delimiting lines with CRLF. Any lin starting
+Send data to the remote server, converting LF to CRLF. Any line starting
 with a '.' will be prefixed with another '.'.
+C<DATA> may be an array or a reference to an array.
 
 =item dataend ()
 
@@ -149,10 +158,6 @@ of C<response> and C<status>. The sixth is C<CMD_PENDING>.
 
 Graham Barr <Graham.Barr@tiuk.ti.com>
 
-=head1 REVISION
-
-$Revision: 2.2 $
-
 =head1 COPYRIGHT
 
 Copyright (c) 1995 Graham Barr. All rights reserved. This program is free
@@ -168,7 +173,7 @@ use strict;
 use vars qw(@ISA @EXPORT $VERSION);
 use Carp;
 
-$VERSION = sprintf("%d.%02d", q$Revision: 2.2 $ =~ /(\d+)\.(\d+)/);
+$VERSION = "2.07";
 @ISA     = qw(Exporter);
 @EXPORT  = qw(CMD_INFO CMD_OK CMD_MORE CMD_REJECT CMD_ERROR CMD_PENDING);
 
@@ -297,8 +302,12 @@ sub set_status
  @_ == 3 or croak 'usage: $obj->set_status( CODE, MESSAGE)';
 
  my $cmd = shift;
+ my($code,$resp) = @_;
 
- (${*$cmd}{'net_cmd_code'},${*$cmd}{'net_cmd_resp'}) = @_;
+ $resp = [ $resp ]
+	unless ref($resp);
+
+ (${*$cmd}{'net_cmd_code'},${*$cmd}{'net_cmd_resp'}) = ($code, $resp);
 
  1;
 }
@@ -312,7 +321,7 @@ sub command
 
  if (scalar(@_))
   {
-   my $str = join(" ", @_) . "\015\012";
+   my $str =  join(" ",@_) . "\015\012";
 
    syswrite($cmd,$str,length $str);
 
@@ -368,6 +377,7 @@ sub getline
      unless (sysread($cmd, $buf="", 1024))
       {
        carp ref($cmd) . ": Unexpected EOF on command channel";
+       $cmd->close;
        return undef;
       } 
 
@@ -424,12 +434,9 @@ sub response
 
    $cmd->debug_print(0,$str)
      if ($cmd->debug);
- 
-   if($str =~ s/^(\d\d\d)(.?)//o)
-    {
-     ($code,$more) = ($1,$2 && $2 eq "-");
-    }
-   elsif(!$more)
+
+   ($code,$more) = $cmd->parse_response($str);
+   unless(defined $code)
     {
      $cmd->ungetline($str);
      last;
@@ -470,29 +477,30 @@ sub read_until_dot
 sub datasend
 {
  my $cmd = shift;
- my $lch = exists ${*$cmd}{'net_cmd_lastch'} ? ${*$cmd}{'net_cmd_lastch'}
-                                             : " ";
  my $arr = @_ == 1 && ref($_[0]) ? $_[0] : \@_;
- my $line = $lch . join("" ,@$arr);
-
- ${*$cmd}{'net_cmd_lastch'} = substr($line,-1,1);
+ my $line = join("" ,@$arr);
 
  return 1
-    unless length($line) > 1;
+    unless length($line);
 
  if($cmd->debug)
   {
-   my $ln = substr($line,1);
    my $b = "$cmd>>> ";
-   print STDERR $b,join("\n$b",split(/\n/,$ln)),"\n";
+   print STDERR $b,join("\n$b",split(/\n/,$line)),"\n";
   }
 
  $line =~ s/\n/\015\012/sgo;
+
+ ${*$cmd}{'net_cmd_lastch'} ||= " ";
+ $line = ${*$cmd}{'net_cmd_lastch'} . $line;
+
  $line =~ s/(?=\012\.)/./sgo;
- 
+
+ ${*$cmd}{'net_cmd_lastch'} = substr($line,-1,1);
+
  my $len = length($line) - 1;
 
- return $len < 1 ||
+ return $len == 0 ||
 	syswrite($cmd, $line, $len, 1) == $len;
 }
 

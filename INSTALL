@@ -1,0 +1,20 @@
+Before building this extension you will require the following modules. The 
+building of the Makefile will abort if you do not have the required versions.
+All of these modules should be avaliable from CPAN (see README.CPAN for 
+more information)
+
+   IO     v1.05
+   Socket v1.03
+
+To configure the library, you must edit the configuration section of
+Configure and run
+
+   perl Configure
+
+Then build and install the library by running these commands:
+
+   perl Makefile.PL
+   make
+   make test
+   make install
+

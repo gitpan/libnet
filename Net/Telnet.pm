@@ -29,10 +29,6 @@ protocol as defined in RFC854
 
 Graham Barr <Graham.Barr@tiuk.ti.com>
 
-=head1 REVISION
-
-$Revision: 2.0 $
-
 =head1 COPYRIGHT
 
 Copyright (c) 1995 Graham Barr. All rights reserved. This program is free
@@ -41,11 +37,13 @@ as Perl itself.
 
 =cut
 
-use     vars qw(@ISA $VERSION);
+use     strict;
+use     vars qw(@ISA $VERSION @EXPORT_OK);
 require	Exporter;
+
 @ISA = qw(Exporter);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 2.0 $ =~ /(\d+)\.(\d+)/);
+$VERSION = "2.01";
 
 my %telnet = (
 	TELNET_IAC	=> 255,		# interpret as command:
@@ -72,6 +70,7 @@ my %telnet = (
 	TELNET_SYNCH	=> 242,		# for telfunc calls
 );
 
+my($n,$v);
 while(($n,$v) =	each %telnet) {	eval "sub $n {$v}"; }
 
 sub telnet_command {

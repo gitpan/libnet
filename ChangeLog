@@ -1,3 +1,20 @@
+Mon Dec 23 1996
+	o Release 1.02
+	o Updated Net::FTP Documentation
+	o Added Configure to create Net::Config
+	o Added Net::PH
+	o Fixed a bug in Net::NNTP::xover
+	o Implemented Net::NNTP::xrover
+	o Changed Net::FTP::mkdir to return it's directory argument
+	  it the server suceeds but does not return the full path
+	o Applied patch from Gisle Aas <aas@bergen.sn.no> to fix
+	  bug with checking arguments of login
+	o Fixed Net::Netrc to return 'default' for when the given host
+	  does not exist
+	o Changed _POST to check for CMD_MORE
+	o Fixed Net::Cmd::datasend to stop addition of extra newlines
+	o Added patch to mdtm from James Jurach <muaddib@ein.cz>
+
 Thu Sep  5 1996 Graham Barr <bodg@tiuk.ti.com>
 	o Release 1.01
 	o Started to add ESMTP support into Net::SMTP

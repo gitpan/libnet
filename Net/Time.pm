@@ -46,10 +46,6 @@ upon failure.
 
 Graham Barr <Graham.Barr@tiuk.ti.com>
 
-=head1 REVISION
-
-$Revision: 2.0 $
-
 =head1 COPYRIGHT
 
 Copyright (c) 1995 Graham Barr. All rights reserved. This program is free
@@ -67,7 +63,7 @@ require Exporter;
 @ISA = qw(Exporter);
 @EXPORT_OK = qw(inet_time inet_daytime);
 
-$VERSION = sprintf("%d.%02d", q$Revision: 2.0 $ =~ /(\d+)\.(\d+)/);
+$VERSION = "2.01";
 
 sub _socket
 {
