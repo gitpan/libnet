@@ -13,7 +13,6 @@ Net/PH.pm			(v2.09) CCSO Nameserver Client class
 Net/POP3.pm			(v2.03) Post Office Protocol
 Net/SMTP.pm			(v2.03) Simple Mail Transfer Protocol Client
 Net/SNPP.pm			(v1.03) Simple Network Pager Protocol Client
-Net/Telnet.pm			(v2.01) 
 Net/Time.pm			(v2.01) time & nettime protocols
 README
 demos/ftp
