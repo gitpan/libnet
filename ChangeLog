@@ -1,3 +1,11 @@
+Change 664 on 2001/10/29 by <gbarr@pobox.com> (Graham Barr)
+
+	Added test for Net::Config from chromatic
+
+Change 663 on 2001/10/26 by <gbarr@pobox.com> (Graham Barr)
+
+	More fixes from the core for undefs
+
 Change 662 on 2001/10/26 by <gbarr@pobox.com> (Graham Barr)
 
 	Make tests compatable with the perl core distribution
