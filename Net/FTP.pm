@@ -1,6 +1,6 @@
 # Net::FTP.pm
 #
-# Copyright (c) 1995 Graham Barr <gbarr@pobox.com>. All rights reserved.
+# Copyright (c) 1995-8 Graham Barr <gbarr@pobox.com>. All rights reserved.
 # This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl itself.
 #
@@ -21,7 +21,7 @@ use Net::Cmd;
 use Net::Config;
 # use AutoLoader qw(AUTOLOAD);
 
-$VERSION = "2.33"; # $Id: //depot/libnet/Net/FTP.pm#18$
+$VERSION = "2.40"; # $Id: //depot/libnet/Net/FTP.pm#25$
 @ISA     = qw(Exporter Net::Cmd IO::Socket::INET);
 
 # Someday I will "use constant", when I am not bothered to much about
@@ -145,6 +145,14 @@ sub quot
  $ftp->response();
 }
 
+sub site
+{
+ my $ftp = shift;
+
+ $ftp->command("SITE", @_);
+ $ftp->response();
+}
+
 sub mdtm
 {
  my $ftp  = shift;
@@ -159,10 +167,30 @@ sub size
 {
  my $ftp  = shift;
  my $file = shift;
-
- $ftp->_SIZE($file)
-	? ($ftp->message =~ /(\d+)/)[0]
-	: undef;
+ my $io;
+ if($ftp->supported("SIZE")) {
+	return $ftp->_SIZE($file)
+	    ? ($ftp->message =~ /(\d+)/)[0]
+	    : undef;
+ }
+ elsif($ftp->supported("STAT")) {
+	my @msg;
+	return undef
+	    unless $ftp->_STAT($file) && (@msg = $ftp->message) == 3;
+	my $line;
+	foreach $line (@msg) {
+	    return (split(/\s+/,$line))[4]
+		if $line =~ /^[-rw]{10}/
+	}
+ }
+ elsif($io = $ftp->list($file)) {
+	my $line;
+	$io->read($line,1024);
+	$io->close;
+	return (split(/\s+/,$1))[4]
+	    if $line =~ /^([-rw]{10}.*)\n/s;
+ }
+ undef;
 }
 
 sub login
@@ -205,7 +233,7 @@ sub login
      ($ruser,$pass,$acct) = $rc->lpa()
 	if ($rc);
 
-     $pass = eval { "-" . (getpwuid($>))[0] . "@" }
+     $pass = "-" . (eval { (getpwuid($>))[0] } || $ENV{NAME} ) . '@'
         if (!defined $pass && (!defined($ruser) || $ruser =~ /^anonymous/o));
     }
 
@@ -239,7 +267,7 @@ sub authorize
   {
    require Net::Netrc;
 
-   $auth ||= eval { (getpwuid($>))[0] };
+   $auth ||= eval { (getpwuid($>))[0] } || $ENV{NAME};
 
    my $rc = Net::Netrc->lookup(${*$ftp}{'net_ftp_firewall'}, $auth)
         || Net::Netrc->lookup(${*$ftp}{'net_ftp_firewall'});
@@ -287,20 +315,14 @@ sub abort
 {
  my $ftp = shift;
 
- send($ftp,pack("CC",$TELNET_IAC,$TELNET_IP),0);
- send($ftp,pack("CC", $TELNET_IAC, $TELNET_DM),MSG_OOB);
+ send($ftp,pack("CCC", $TELNET_IAC, $TELNET_IP, $TELNET_IAC),MSG_OOB);
 
- $ftp->command("ABOR");
-
-# defined ${*$ftp}{'net_ftp_dataconn'}
-#    ? ${*$ftp}{'net_ftp_dataconn'}->close()
-#    : $ftp->response();
+ $ftp->command(pack("C",$TELNET_DM) . "ABOR");
  
  ${*$ftp}{'net_ftp_dataconn'}->close()
     if defined ${*$ftp}{'net_ftp_dataconn'};
 
  $ftp->response();
-#    if $ftp->status == CMD_REJECT;
 
  $ftp->status == CMD_OK;
 }
@@ -317,6 +339,9 @@ sub get
 
  ($local = $remote) =~ s#^.*/##
 	unless(defined $local);
+
+ croak("Bad remote filename '$remote'\n")
+	if $remote =~ /[\s\r\n]/s;
 
  ${*$ftp}{'net_ftp_rest'} = $where
 	if ($where);
@@ -351,12 +376,13 @@ sub get
   }
 
  $buf = '';
-
+ my $swlen;
+ 
  do
   {
    $len = $data->read($buf,1024);
   }
- while($len > 0 && syswrite($loc,$buf,$len) == $len);
+ while($len && defined($swlen = syswrite($loc,$buf,$len)) && $swlen == $len);
 
  close($loc)
 	unless defined $localfd;
@@ -423,15 +449,32 @@ sub mkdir
      $path .= shift @path;
 
      $ftp->_MKD($path);
-     $path = $ftp->_extract_path($path);
 
-     # 521 means directory already exists
-     last
-        unless $ftp->ok || $ftp->code == 521 || $ftp->code == 550;
+     $path = $ftp->_extract_path($path);
+    }
+
+   # If the creation of the last element was not sucessful, see if we
+   # can cd to it, if so then return path
+
+   unless($ftp->ok)
+    {
+     my($status,$message) = ($ftp->status,$ftp->message);
+     my $pwd = $ftp->pwd;
+     
+     if($pwd && $ftp->cd($dir))
+      {
+       $path = $dir;
+       $ftp->cd($pwd);
+      }
+     else
+      {
+       undef $path;
+      }
+     $ftp->set_status($status,$message);
     }
   }
 
- $ftp->_extract_path($path);
+ $path;
 }
 
 sub delete
@@ -466,8 +509,12 @@ sub _store_cmd
    croak 'Must specify remote filename with stream input'
 	if defined $localfd;
 
-   ($remote = $local) =~ s%.*/%%;
+   require File::Basename;
+   $remote = File::Basename::basename($local);
   }
+
+ croak("Bad remote filename '$remote'\n")
+	if $remote =~ /[\s\r\n]/s;
 
  if(defined $localfd)
   {
@@ -500,7 +547,8 @@ sub _store_cmd
   {
    last unless $len = sysread($loc,$buf="",1024);
 
-   unless($sock->write($buf,$len) == $len)
+   my $wlen;
+   unless(defined($wlen = $sock->write($buf,$len)) && $wlen == $len)
     {
      $sock->abort;
      close($loc)
@@ -709,6 +757,12 @@ sub _data_cmd
  my $cmd = uc shift;
  my $ok = 1;
  my $where = delete ${*$ftp}{'net_ftp_rest'} || 0;
+ my $arg;
+
+ for $arg (@_) {
+   croak("Bad argument '$arg'\n")
+	if $arg =~ /[\r\n]/s;
+ }
 
  if(${*$ftp}{'net_ftp_passive'} &&
      !defined ${*$ftp}{'net_ftp_pasv'} &&
@@ -757,9 +811,16 @@ sub _data_cmd
  return $ok 
     unless exists ${*$ftp}{'net_ftp_intern_port'};
 
- return $ftp->_dataconn()
-	if $ok;
+ if($ok) {
+   my $data = $ftp->_dataconn();
 
+   $data->reading
+         if $data && $cmd =~ /RETR|LIST|NLST/;
+
+   return $data;
+ }
+
+ 
  close(delete ${*$ftp}{'net_ftp_listen'});
  
  return undef;
@@ -883,6 +944,7 @@ sub _RESP { shift->command("RESP",@_)->response() == CMD_OK }
 sub _MDTM { shift->command("MDTM",@_)->response() == CMD_OK }
 sub _SIZE { shift->command("SIZE",@_)->response() == CMD_OK }
 sub _HELP { shift->command("HELP",@_)->response() == CMD_OK }
+sub _STAT { shift->command("STAT",@_)->response() == CMD_OK }
 sub _APPE { shift->command("APPE",@_)->response() == CMD_INFO }
 sub _LIST { shift->command("LIST",@_)->response() == CMD_INFO }
 sub _NLST { shift->command("NLST",@_)->response() == CMD_INFO }
@@ -898,9 +960,7 @@ sub _AUTH { shift->command("AUTH",@_)->response() }
 sub _ALLO { shift->unsupported(@_) }
 sub _SMNT { shift->unsupported(@_) }
 sub _MODE { shift->unsupported(@_) }
-sub _SITE { shift->unsupported(@_) }
 sub _SYST { shift->unsupported(@_) }
-sub _STAT { shift->unsupported(@_) }
 sub _STRU { shift->unsupported(@_) }
 sub _REIN { shift->unsupported(@_) }
 
@@ -983,10 +1043,10 @@ B<Timeout> - Set a timeout value (defaults to 120)
 
 B<Debug> - debug level (see the debug method in L<Net::Cmd>)
 
-B<Passive> - If set to I<true> then all data transfers will be done using 
-passive mode. This is required for some I<dumb> servers, and some
-firewall configurations.  This can also be set by the environment
-variable C<FTP_PASSIVE>.
+B<Passive> - If set to a non-zero value then all data transfers will be done
+using passive mode. This is not usually required except for some I<dumb>
+servers, and some firewall configurations. This can also be set by the
+environment variable C<FTP_PASSIVE>.
 
 If the constructor fails undef will be returned and an error message will
 be in $@
@@ -1019,6 +1079,12 @@ be called with no arguments.
 This is a protocol used by some firewall ftp proxies. It is used
 to authorise the user to send data out.  If both arguments are not specified
 then C<authorize> uses C<Net::Netrc> to do a lookup.
+
+=item site (ARGS)
+
+Send a SITE command to the remote server and wait for a response.
+
+Returns most significant digit of the response code.
 
 =item type (TYPE [, ARGS])
 
@@ -1323,10 +1389,6 @@ the commands it accepts.
 Specifies transfer mode (stream, block or compressed) for file to be
 transferred.
 
-=item B<SITE>
-
-Request remote server site parameters.
-
 =item B<SYST>
 
 Request remote server system identification.
@@ -1380,7 +1442,7 @@ Roderick Schertler <roderick@gate.net> - for various inputs
 
 =head1 COPYRIGHT
 
-Copyright (c) 1995-1997 Graham Barr. All rights reserved.
+Copyright (c) 1995-1998 Graham Barr. All rights reserved.
 This program is free software; you can redistribute it and/or modify it
 under the same terms as Perl itself.
 

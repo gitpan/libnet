@@ -13,7 +13,7 @@ use Net::Cmd;
 use Carp;
 use Net::Config;
 
-$VERSION = "2.12"; # $Id: //depot/libnet/Net/POP3.pm#6$
+$VERSION = "2.16"; # $Id: //depot/libnet/Net/POP3.pm#10$
 
 @ISA = qw(Net::Cmd IO::Socket::INET);
 
@@ -25,6 +25,7 @@ sub new
  my %arg  = @_; 
  my $hosts = defined $host ? [ $host ] : $NetConfig{pop3_hosts};
  my $obj;
+ my @localport = exists $arg{ResvPort} ? ( LocalPort => $arg{ResvPort} ): ();
 
  my $h;
  foreach $h (@{$hosts})
@@ -32,6 +33,7 @@ sub new
    $obj = $type->SUPER::new(PeerAddr => ($host = $h), 
 			    PeerPort => $arg{Port} || 'pop3(110)',
 			    Proto    => 'tcp',
+			    @localport,
 			    Timeout  => defined $arg{Timeout}
 						? $arg{Timeout}
 						: 120
@@ -73,7 +75,7 @@ sub login
   {
    require Net::Netrc;
 
-   $user ||= (getpwuid($>))[0];
+   $user ||= eval { (getpwuid($>))[0] } || $ENV{NAME};
 
    my $m = Net::Netrc->lookup(${*$me}{'net_pop3_host'},$user);
 
@@ -106,7 +108,7 @@ sub apop
   {
    require Net::Netrc;
 
-   $user ||= (getpwuid($>))[0];
+   $user ||= eval { (getpwuid($>))[0] } || $ENV{NAME};
 
    my $m = Net::Netrc->lookup(${*$me}{'net_pop3_host'},$user);
 
@@ -142,9 +144,8 @@ sub pass
  return undef
    unless($me->_PASS($pass));
 
- $me->message =~ /(\d+)\s+message/io;
-
- ${*$me}{'net_pop3_count'} = $1 || 0;
+ ${*$me}{'net_pop3_count'} = ($me->message =~ /(\d+)\s+message/io)
+	? $1 : ($me->popstat)[0];
 }
 
 sub reset
@@ -215,8 +216,7 @@ sub list
  my $info = $me->read_until_dot
 	or return undef;
 
- my %hash = ();
- map { /(\d+)\D+(\d+)/; $hash{$1} = $2; } @$info;
+ my %hash = map { (/(\d+)\D+(\d+)/) } @$info;
 
  return \%hash;
 }
@@ -371,6 +371,10 @@ will be used.
 
 C<OPTIONS> are passed in a hash like fashion, using key and value pairs.
 Possible options are:
+
+B<ResvPort> - If given then the socket for the C<Net::POP3> object
+will be bound to the local port given using C<bind> when the socket is
+created.
 
 B<Timeout> - Maximum time, in seconds, to wait for a response from the
 POP3 server (default: 120)

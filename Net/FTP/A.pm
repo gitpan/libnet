@@ -10,7 +10,17 @@ use Carp;
 require Net::FTP::dataconn;
 
 @ISA = qw(Net::FTP::dataconn);
-$VERSION = sprintf("1.%02d",(q$Id: //depot/libnet/Net/FTP/A.pm#6$ =~ /#(\d+)/)[0]);
+$VERSION = "1.08"; # $Id: //depot/libnet/Net/FTP/A.pm#8$
+
+sub new
+{
+ my $class = shift;
+ my $data = $class->SUPER::new(@_) || return undef;
+
+ ${*$data}{'net_ftp_last'} = " ";
+
+ $data;
+}
 
 sub read
 {
@@ -31,8 +41,8 @@ sub read
    ${*$data} = "";
    my $n = sysread($data, $buf, $size, length $buf);
 
-   return $n
-     if($n < 0);
+   return undef
+     unless defined $n;
 
    ${*$data}{'net_ftp_bytesread'} += $n;
    ${*$data}{'net_ftp_eof'} = 1 unless $n;
@@ -67,10 +77,12 @@ sub write
  $data->can_write($timeout) or
 	croak "Timeout";
 
- # What is previous pkt ended in \015 or not ??
+ my $offset = ${*$data}{'net_ftp_last'} && substr($buf,0,1) eq "\012" ? 1 : 0;
+ ${*$data}{'net_ftp_last'} = substr($buf,-1) eq "\015";
 
  my $tmp;
- ($tmp = substr($buf,0,$size)) =~ s/(?!\015)\012/\015\012/sg;
+ ($tmp = substr($buf,$offset,$size-$offset))
+	=~ s/\015\012|\015|\012/\015\012/sg;
 
  # If the remote server has closed the connection we will be signal'd
  # when we write. This can happen if the disk on the remote server fills up
@@ -84,8 +96,8 @@ sub write
  while($len) {
    $off += $wrote;
    $wrote = syswrite($data, substr($tmp,$off), $len);
-   return $wrote
-     if $wrote <= 0;
+   return undef
+     unless defined($wrote);
    $len -= $wrote;
  }
 

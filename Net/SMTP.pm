@@ -16,7 +16,7 @@ use IO::Socket;
 use Net::Cmd;
 use Net::Config;
 
-$VERSION = "2.10"; # $Id: //depot/libnet/Net/SMTP.pm#5$
+$VERSION = "2.13"; # $Id: //depot/libnet/Net/SMTP.pm#9$
 
 @ISA = qw(Net::Cmd IO::Socket::INET);
 
@@ -56,9 +56,14 @@ sub new
 
  ${*$obj}{'net_smtp_host'} = $host;
 
+ (${*$obj}{'net_smtp_banner'}) = $obj->message;
  (${*$obj}{'net_smtp_domain'}) = $obj->message =~ /\A\s*(\S+)/;
 
- $obj->hello($arg{Hello} || "");
+ unless($obj->hello($arg{Hello} || ""))
+  {
+   $obj->close();
+   return undef;
+  }
 
  $obj;
 }
@@ -67,11 +72,24 @@ sub new
 ## User interface methods
 ##
 
+sub banner
+{
+ my $me = shift;
+
+ return ${*$me}{'net_smtp_banner'} || undef;
+}
+
 sub domain
 {
  my $me = shift;
 
  return ${*$me}{'net_smtp_domain'} || undef;
+}
+
+sub etrn {
+    my $self = shift;
+    defined($self->supports('ETRN',500,["Command unknown: 'ETRN'"])) &&
+	$self->_ETRN(@_);
 }
 
 sub hello
@@ -84,29 +102,36 @@ sub hello
 		   } ||
 		"";
  my $ok = $me->_EHLO($domain);
- my $msg;
+ my @msg = $me->message;
 
  if($ok)
   {
-   $msg = $me->message;
-
    my $h = ${*$me}{'net_smtp_esmtp'} = {};
-   my $ext;
-   foreach $ext (qw(8BITMIME CHECKPOINT DSN SIZE))
-    {
-     $h->{$ext} = 1
-	if $msg =~ /\b${ext}\b/;
+   my $ln;
+   foreach $ln (@msg) {
+     $h->{$1} = $2
+	if $ln =~ /(\S+)\b[ \t]*([^\n]*)/;
     }
   }
- else
+ elsif($me->status == CMD_ERROR) 
   {
-   $msg = $me->message
-	if $me->_HELO($domain);
+   @msg = $me->message
+	if $ok = $me->_HELO($domain);
   }
 
- $ok && $msg =~ /\A(\S+)/
+ $ok && $msg[0] =~ /\A(\S+)/
 	? $1
 	: undef;
+}
+
+sub supports {
+    my $self = shift;
+    my $cmd = uc shift;
+    return ${*$self}{'net_smtp_esmtp'}->{$cmd}
+	if exists ${*$self}{'net_smtp_esmtp'}->{$cmd};
+    $self->set_status(@_)
+	if @_;
+    return;
 }
 
 sub _addr
@@ -338,6 +363,7 @@ sub _NOOP { shift->command("NOOP")->response()	    == CMD_OK }
 sub _QUIT { shift->command("QUIT")->response()	    == CMD_OK }   
 sub _DATA { shift->command("DATA")->response()	    == CMD_MORE } 
 sub _TURN { shift->unsupported(@_); } 			   	  
+sub _ETRN { shift->command("ETRN", @_)->response()  == CMD_OK }
 
 1;
 
@@ -442,6 +468,11 @@ empty list.
 
 =over 4
 
+=item banner ()
+
+Returns the banner message which the server replied with when the
+initial connection was made.
+
 =item domain ()
 
 Returns the domain that the remote SMTP server identified itself as during
@@ -453,6 +484,10 @@ Tell the remote server the mail domain which you are in using the EHLO
 command (or HELO if EHLO fails).  Since this method is invoked
 automatically when the Net::SMTP object is constructed the user should
 normally not have to call it manually.
+
+=item etrn ( DOMAIN )
+
+Request a queue run for the DOMAIN given.
 
 =item mail ( ADDRESS [, OPTIONS] )
 
