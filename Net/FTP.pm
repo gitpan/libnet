@@ -455,7 +455,7 @@ use Time::Local;
 use Net::Cmd;
 use Net::Telnet qw(TELNET_IAC TELNET_IP TELNET_DM);
 
-$VERSION = "2.11";
+$VERSION = "2.12";
 @ISA     = qw(Exporter Net::Cmd IO::Socket::INET);
 
 sub new
@@ -746,6 +746,12 @@ sub get
     }
   }
 
+ if($ftp->binary && !binmode($loc))
+  {
+   carp "Cannot binmode Local file $local: $!\n";
+   $data->abort;
+   return undef;
+  }
 
  $buf = '';
 
@@ -879,6 +885,12 @@ sub _store_cmd
      carp "Cannot open Local file $local: $!\n";
      return undef;
     }
+  }
+
+ if($ftp->binary && !binmode($loc))
+  {
+   carp "Cannot binmode Local file $local: $!\n";
+   return undef;
   }
 
  delete ${*$ftp}{'net_ftp_port'};

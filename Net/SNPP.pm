@@ -127,7 +127,7 @@ use Carp;
 use IO::Socket;
 use Net::Cmd;
 
-$VERSION = "1.02";
+$VERSION = "1.03";
 @ISA     = qw(Net::Cmd IO::Socket::INET);
 @EXPORT  = qw(CMD_2WAYERROR CMD_2WAYOK CMD_2WAYQUEUED);
 
@@ -269,8 +269,7 @@ sub service_level
 {
  @_ == 2 or croak 'usage: $snpp->service_level( LEVEL )';
  my $me = shift;
- my $levl = int(shift);
- my($me,$level) = @_;
+ my $level = int(shift);
 
  if($level < 0 || $level > 11)
   {
@@ -278,7 +277,7 @@ sub service_level
    return 0;
   }
 
- $me->_LEVE($levl);
+ $me->_LEVE($level);
 }
 
 sub alert

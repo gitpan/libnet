@@ -399,6 +399,7 @@ use vars qw(@ISA $VERSION $debug);
 use IO::Socket;
 use Net::Cmd;
 use Carp;
+use Time::Local;
 
 $VERSION = "2.08";
 @ISA     = qw(Net::Cmd IO::Socket::INET);
@@ -833,7 +834,7 @@ sub date
  my $nntp = shift;
 
  $nntp->_DATE && $nntp->message =~ /(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)/
-    ? timegm($6,$5,$4,$3,$2-1,$1)
+    ? timegm($6,$5,$4,$3,$2-1,$1 - 1900)
     : undef;
 }
 

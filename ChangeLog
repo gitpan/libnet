@@ -1,3 +1,9 @@
+Thu Jan 02 1996
+	o Release 1.03
+	o Fixed a bug in Net::SNPP::service_level
+	o Added binmode patch to Net::FTP
+	o Fixed Net::NNTP::date
+
 Mon Dec 23 1996
 	o Release 1.02
 	o Updated Net::FTP Documentation
