@@ -5,6 +5,9 @@ BEGIN {
 	chdir 't' if -d 't';
 	@INC = '../lib';
     }
+    if (!eval "require Socket") {
+	print "1..0 # no Socket\n"; exit 0;
+    }
     if (ord('A') == 193 && !eval "require Convert::EBCDIC") {
         print "1..0 # EBCDIC but no Convert::EBCDIC\n"; exit 0;
     }
@@ -55,7 +58,8 @@ SKIP: {
 	$stat[2] = 077;
 	ok( !defined(Net::Netrc::_readrc()),
 		'_readrc() should not read world-writable file' );
-	ok( $warn =~ /^Bad permissions:/, '... and should warn about it' );
+	ok( scalar($warn =~ /^Bad permissions:/),
+		'... and should warn about it' );
 
 	# the owner field should still not match
 	$stat[2] = 0;
@@ -63,7 +67,8 @@ SKIP: {
         if ($<) { 
           ok( !defined(Net::Netrc::_readrc()), 
               '_readrc() should not read file owned by someone else' ); 
-          ok( $warn =~ /^Not owner:/, '... and should warn about it' ); 
+          ok( scalar($warn =~ /^Not owner:/),
+		'... and should warn about it' ); 
         } else { 
           skip("testing as root",2);
         } 
