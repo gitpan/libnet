@@ -16,7 +16,7 @@ use IO::Socket;
 use Net::Cmd;
 use Net::Config;
 
-$VERSION = "2.15"; # $Id: //depot/libnet/Net/SMTP.pm#11 $
+$VERSION = "2.15"; # $Id$
 
 @ISA = qw(Net::Cmd IO::Socket::INET);
 

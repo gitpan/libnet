@@ -21,7 +21,7 @@ use Net::Cmd;
 use Net::Config;
 # use AutoLoader qw(AUTOLOAD);
 
-$VERSION = "2.53"; # $Id$
+$VERSION = "2.55"; # $Id$
 @ISA     = qw(Exporter Net::Cmd IO::Socket::INET);
 
 # Someday I will "use constant", when I am not bothered to much about
@@ -49,8 +49,7 @@ sub new
  my $host = $peer;
  my $fire = undef;
 
- # Should I use Net::Ping here ?? --GMB
- if(exists($arg{Firewall}) || !defined(inet_aton($peer)))
+ if(exists($arg{Firewall}) || Net::Config->requires_firewall($peer))
   {
    $fire = $arg{Firewall}
 	|| $ENV{FTP_FIREWALL}
@@ -74,6 +73,7 @@ sub new
 
  ${*$ftp}{'net_ftp_host'}     = $host;		# Remote hostname
  ${*$ftp}{'net_ftp_type'}     = 'A';		# ASCII/binary/etc mode
+ ${*$ftp}{'net_ftp_blksize'}  = abs($arg{'BlockSize'} || 10240);
 
  ${*$ftp}{'net_ftp_firewall'} = $fire
 	if(defined $fire);
@@ -186,8 +186,16 @@ sub mdtm
  my $ftp  = shift;
  my $file = shift;
 
- $ftp->_MDTM($file) && $ftp->message =~ /(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)/
-    ? timegm($6,$5,$4,$3,$2-1,$1 - 1900)
+ # Server Y2K bug workaround
+ #
+ # sigh; some idiotic FTP servers use ("19%d",tm.tm_year) instead of 
+ # ("%d",tm.tm_year+1900).  This results in an extra digit in the
+ # string returned. To account for this we allow an optional extra
+ # digit in the year. Then if the first two digits are 19 we use the
+ # remainder, otherwise we subtract 1900 from the whole year.
+
+ $ftp->_MDTM($file) && $ftp->message =~ /((\d\d)(\d\d\d?))(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)/
+    ? timegm($8,$7,$6,$5,$4-1,$2 eq '19' ? $3 : ($1-1900))
     : undef;
 }
 
@@ -220,62 +228,101 @@ sub size {
  undef;
 }
 
-sub login
-{
- my($ftp,$user,$pass,$acct) = @_;
- my($ok,$ruser);
+sub login {
+  my($ftp,$user,$pass,$acct) = @_;
+  my($ok,$ruser,$fwtype);
 
- unless (defined $user)
-  {
-   require Net::Netrc;
+  unless (defined $user) {
+    require Net::Netrc;
 
-   my $rc = Net::Netrc->lookup(${*$ftp}{'net_ftp_host'});
+    my $rc = Net::Netrc->lookup(${*$ftp}{'net_ftp_host'});
 
-   ($user,$pass,$acct) = $rc->lpa()
-	if ($rc);
+    ($user,$pass,$acct) = $rc->lpa()
+	 if ($rc);
+   }
+
+  $user ||= "anonymous";
+  $ruser = $user;
+
+  $fwtype = $NetConfig{'ftp_firewall_type'} || 0;
+
+  if ($fwtype && defined ${*$ftp}{'net_ftp_firewall'}) {
+    if ($fwtype == 1 || $fwtype == 7) {
+      $user .= '@' . ${*$ftp}{'net_ftp_host'};
+    }
+    else {
+      require Net::Netrc;
+
+      my $rc = Net::Netrc->lookup(${*$ftp}{'net_ftp_firewall'});
+
+      my($fwuser,$fwpass,$fwacct) = $rc ? $rc->lpa() : ();
+
+      if ($fwtype == 5) {
+	$user = join('@',$user,$fwuser,${*$ftp}{'net_ftp_host'});
+	$pass = $pass . '@' . $fwpass;
+      }
+      else {
+	if ($fwtype == 2) {
+	  $user .= '@' . ${*$ftp}{'net_ftp_host'};
+	}
+	elsif ($fwtype == 6) {
+	  $fwuser .= '@' . ${*$ftp}{'net_ftp_host'};
+	}
+
+	$ok = $ftp->_USER($fwuser);
+
+	return 0 unless $ok == CMD_OK || $ok == CMD_MORE;
+
+	$ok = $ftp->_PASS($fwpass || "");
+
+	return 0 unless $ok == CMD_OK || $ok == CMD_MORE;
+
+	$ok = $ftp->_ACCT($fwacct)
+	  if defined($fwacct);
+
+	if ($fwtype == 3) {
+          $ok = $ftp->command("SITE",${*$ftp}{'net_ftp_host'})->response;
+	}
+	elsif ($fwtype == 4) {
+          $ok = $ftp->command("OPEN",${*$ftp}{'net_ftp_host'})->response;
+	}
+
+	return 0 unless $ok == CMD_OK || $ok == CMD_MORE;
+      }
+    }
   }
 
- $user ||= "anonymous";
- $ruser = $user;
+  $ok = $ftp->_USER($user);
 
- if(defined ${*$ftp}{'net_ftp_firewall'})
-  {
-   $user .= '@' . ${*$ftp}{'net_ftp_host'};
-  }
+  # Some dumb firewalls don't prefix the connection messages
+  $ok = $ftp->response()
+	 if ($ok == CMD_OK && $ftp->code == 220 && $user =~ /\@/);
 
- $ok = $ftp->_USER($user);
+  if ($ok == CMD_MORE) {
+    unless(defined $pass) {
+      require Net::Netrc;
 
- # Some dumb firewalls don't prefix the connection messages
- $ok = $ftp->response()
-	if($ok == CMD_OK && $ftp->code == 220 && $user =~ /\@/);
+      my $rc = Net::Netrc->lookup(${*$ftp}{'net_ftp_host'}, $ruser);
 
- if ($ok == CMD_MORE)
-  {
-   unless(defined $pass)
-    {
-     require Net::Netrc;
+      ($ruser,$pass,$acct) = $rc->lpa()
+	 if ($rc);
 
-     my $rc = Net::Netrc->lookup(${*$ftp}{'net_ftp_host'}, $ruser);
-
-     ($ruser,$pass,$acct) = $rc->lpa()
-	if ($rc);
-
-     $pass = "-" . (eval { (getpwuid($>))[0] } || $ENV{NAME} ) . '@'
-        if (!defined $pass && (!defined($ruser) || $ruser =~ /^anonymous/o));
+      $pass = "-" . (eval { (getpwuid($>))[0] } || $ENV{NAME} ) . '@'
+         if (!defined $pass && (!defined($ruser) || $ruser =~ /^anonymous/o));
     }
 
-   $ok = $ftp->_PASS($pass || "");
+    $ok = $ftp->_PASS($pass || "");
   }
 
- $ok = $ftp->_ACCT($acct)
-	if (defined($acct) && ($ok == CMD_MORE || $ok == CMD_OK));
+  $ok = $ftp->_ACCT($acct)
+	 if (defined($acct) && ($ok == CMD_MORE || $ok == CMD_OK));
 
- if($ok == CMD_OK && defined ${*$ftp}{'net_ftp_firewall'}) {
-   my($f,$auth,$resp) = _auth_id($ftp);
-   $ftp->authorize($auth,$resp) if defined($resp);
- }
+  if ($fwtype == 7 && $ok == CMD_OK && defined ${*$ftp}{'net_ftp_firewall'}) {
+    my($f,$auth,$resp) = _auth_id($ftp);
+    $ftp->authorize($auth,$resp) if defined($resp);
+  }
 
- $ok == CMD_OK;
+  $ok == CMD_OK;
 }
 
 sub account
@@ -299,7 +346,7 @@ sub _auth_id {
         || Net::Netrc->lookup(${*$ftp}{'net_ftp_firewall'});
 
    ($auth,$resp) = $rc->lpa()
-     if($rc);
+     if ($rc);
   }
   ($ftp,$auth,$resp);
 }
@@ -417,9 +464,11 @@ sub get
  ($hashh,$hashb) = @$ref
    if($ref = ${*$ftp}{'net_ftp_hash'});
 
+ my $blksize = ${*$ftp}{'net_ftp_blksize'};
+
  while(1)
   {
-   last unless $len = $data->read($buf,1024);
+   last unless $len = $data->read($buf,$blksize);
    if($hashh) {
     $count += $len;
     print $hashh "#" x (int($count / $hashb));
@@ -448,7 +497,7 @@ sub get
 
 sub cwd
 {
- @_ == 2 || @_ == 3 or croak 'usage: $ftp->cwd( [ DIR ] )';
+ @_ == 1 || @_ == 2 or croak 'usage: $ftp->cwd( [ DIR ] )';
 
  my($ftp,$dir) = @_;
 
@@ -641,7 +690,8 @@ sub _store_cmd
  $sock = $ftp->_data_cmd($cmd, $remote) or 
 	return undef;
 
- my $blk_size = ${*$ftp}{'net_ftp_blk_size'} || 10240;
+ my $blksize = ${*$ftp}{'net_ftp_blksize'};
+
  my($count,$hashh,$hashb,$ref) = (0);
 
  ($hashh,$hashb) = @$ref
@@ -649,7 +699,7 @@ sub _store_cmd
 
  while(1)
   {
-   last unless $len = sysread($loc,$buf="",$blk_size);
+   last unless $len = sysread($loc,$buf="",$blksize);
 
    if($hashh) {
     $count += $len;
@@ -839,6 +889,7 @@ sub _dataconn
    $data->timeout($ftp->timeout);
    ${*$ftp}{'net_ftp_dataconn'} = $data;
    ${*$data}{'net_ftp_cmd'} = $ftp;
+   ${*$data}{'net_ftp_blksize'} = ${*$ftp}{'net_ftp_blksize'};
   }
 
  $data;
@@ -862,11 +913,11 @@ sub _list_cmd
 
  my $databuf = '';
  my $buf = '';
+ my $blksize = ${*$ftp}{'net_ftp_blksize'};
 
- while($data->read($databuf,1024))
-  {
+ while($data->read($databuf,$blksize)) {
    $buf .= $databuf;
-  }
+ }
 
  my $list = [ split(/\n/,$buf) ];
 
@@ -1160,6 +1211,9 @@ given host cannot be directly connected to, then the
 connection is made to the firewall machine and the string C<@hostname> is
 appended to the login identifier. This kind of setup is also refered to
 as a ftp proxy.
+
+B<BlockSize> - This is the block size that Net::FTP will use when doing
+transfers. (defaults to 10240)
 
 B<Port> - The port number to connect to on the remote machine for the
 FTP connection

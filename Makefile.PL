@@ -5,7 +5,7 @@
 
 $NAME     = 'Net';
 $DISTNAME = "libnet";
-$VERSION  = "1.06";
+$VERSION  = "1.07";
 
 BEGIN { require 5.002 }
 
@@ -89,6 +89,8 @@ WriteMakefile(
 	VERSION   => $VERSION,
 	DISTNAME  => $DISTNAME,
 	NAME      => $NAME,
+	AUTHOR    => 'Graham Barr <gbarr@pobox.com>',
+	ABSTRACT  => 'Collection of Network protocol modules',
 	'realclean'   => {FILES => $config_pm},
 	PREREQ_PM => {
 			Socket => 1.3,
