@@ -1,69 +1,10 @@
 # Net::DummyInetd.pm
 #
-# Copyright (c) 1995 Graham Barr <Graham.Barr@tiuk.ti.com>. All rights
-# reserved. This program is free software; you can redistribute it and/or
+# Copyright (c) 1995-1997 Graham Barr <gbarr@ti.com>. All rights reserved.
+# This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl itself.
 
 package Net::DummyInetd;
-
-=head1 NAME
-
-Net::DummyInetd - A dummy Inetd server
-
-=head1 SYNOPSIS
-
-    use Net::DummyInetd;
-    use Net::SMTP;
-    
-    $inetd = new Net::DummyInetd qw(/usr/lib/sendmail -ba -bs);
-    
-    $smtp  = Net::SMTP->new('localhost', Port => $inetd->port);
-
-=head1 DESCRIPTION
-
-C<Net::DummyInetd> is just what it's name says, it is a dummy inetd server.
-Creation of a C<Net::DummyInetd> will cause a child process to be spawned off
-which will listen to a socket. When a connection arrives on this socket
-the specified command is fork'd and exec'd with STDIN and STDOUT file
-descriptors duplicated to the new socket.
-
-This package was added as an example of how to use C<Net::SMTP> to connect
-to a C<sendmail> process, which is not the default, via SIDIN and STDOUT.
-A C<Net::Inetd> package will be avaliable in the next release of C<libnet>
-
-=head1 CONSTRUCTOR
-
-=over 4
-
-=item new ( CMD )
-
-Creates a new object and spawns a child process which listens to a socket.
-C<CMD> is a list, which will be passed to C<exec> when a new process needs
-to be created.
-
-=back
-
-=head1 METHODS
-
-=over 4
-
-=item port
-
-Returns the port number on which the I<DummyInet> object is listening
-
-=back
-
-=head1 AUTHOR
-
-Graham Barr <Graham.Barr@tiuk.ti.com>
-
-=head1 COPYRIGHT
-
-Copyright (c) 1995 Graham Barr. All rights reserved. This program is free
-software; you can redistribute it and/or modify it under the same terms
-as Perl itself.
-
-=cut
 
 require 5.002;
 
@@ -73,7 +14,7 @@ use strict;
 use vars qw($VERSION);
 use Carp;
 
-$VERSION = "1.03";
+$VERSION = do { my @r=(q$Revision: 1.6 $=~/\d+/g); sprintf "%d."."%02d"x$#r,@r};
 
 
 sub _process
@@ -144,3 +85,64 @@ sub DESTROY
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+Net::DummyInetd - A dummy Inetd server
+
+=head1 SYNOPSIS
+
+    use Net::DummyInetd;
+    use Net::SMTP;
+    
+    $inetd = new Net::DummyInetd qw(/usr/lib/sendmail -ba -bs);
+    
+    $smtp  = Net::SMTP->new('localhost', Port => $inetd->port);
+
+=head1 DESCRIPTION
+
+C<Net::DummyInetd> is just what it's name says, it is a dummy inetd server.
+Creation of a C<Net::DummyInetd> will cause a child process to be spawned off
+which will listen to a socket. When a connection arrives on this socket
+the specified command is fork'd and exec'd with STDIN and STDOUT file
+descriptors duplicated to the new socket.
+
+This package was added as an example of how to use C<Net::SMTP> to connect
+to a C<sendmail> process, which is not the default, via SIDIN and STDOUT.
+A C<Net::Inetd> package will be available in the next release of C<libnet>
+
+=head1 CONSTRUCTOR
+
+=over 4
+
+=item new ( CMD )
+
+Creates a new object and spawns a child process which listens to a socket.
+C<CMD> is a list, which will be passed to C<exec> when a new process needs
+to be created.
+
+=back
+
+=head1 METHODS
+
+=over 4
+
+=item port
+
+Returns the port number on which the I<DummyInetd> object is listening
+
+=back
+
+=head1 AUTHOR
+
+Graham Barr <gbarr@ti.com>
+
+=head1 COPYRIGHT
+
+Copyright (c) 1995-1997 Graham Barr. All rights reserved.
+This program is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut

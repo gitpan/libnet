@@ -1,317 +1,10 @@
 #
-# Copyright (c) 1995 Graham Barr <Graham.Barr@tiuk.ti.com> and Alex Hristov
-# <hristov@slb.com>. All rights reserved. This program is free software; you
-# can redistribute it and/or modify it under the same terms as Perl itself.
+# Copyright (c) 1995-1997 Graham Barr <gbarr@ti.com> and
+# Alex Hristov <hristov@slb.com>. All rights reserved. This program is free
+# software; you # can redistribute it and/or modify it under the same terms
+# as Perl itself.
 
 package Net::PH;
-
-=head1 NAME
-
-Net::PH - CCSO Nameserver Client class
-
-=head1 SYNOPSIS
-
-    use Net::PH;
-    
-    $ph = Net::PH->new("some.host.name",
-                       Port    => 105,
-                       Timeout => 120,
-                       Debug   => 0);
-
-    if($ph) {
-        $q = $ph->query({ field1 => "value1" },
-                        [qw(name address pobox)]);
-    
-        if($q) {
-        }
-    }
-    
-    # Alternative syntax
-    
-    if($ph) {
-        $q = $ph->query('field1=value1',
-                        'name address pobox');
-    
-        if($q) {
-        }
-    }
-
-=head1 DESCRIPTION
-
-C<Net::PH> is a class implementing a simple Nameserver/PH client in Perl
-as described in the CCSO Nameserver -- Server-Client Protocol. Like other
-modules in the Net:: family the C<Net::PH> object inherits methods from
-C<Net::Cmd>.
-
-=head1 CONSTRUCTOR
-
-=over 4
-
-=item new ( [ HOST ] [, OPTIONS ])
-
-    $ph = Net::PH->new("some.host.name",
-                       Port    => 105,
-                       Timeout => 120,
-                       Debug   => 0
-                      );
-
-This is the constructor for a new Net::PH object. C<HOST> is the
-name of the remote host to which a PH connection is required.
-
-If C<HOST> is not given, then the C<SNPP_Host> specified in C<Net::Config>
-will be used.
-
-C<OPTIONS> is an optional list of named options which are passed in
-a hash like fasion, using key and value pairs. Possible options are:-
-
-B<Port> - Port number to connect to on remote host.
-
-B<Timeout> - Maximum time, in seconds, to wait for a response from the
-Nameserver, a value of zero will cause all IO operations to block.
-(default: 120)
-
-B<Debug> - Enable the printing of debugging information to STDERR
-
-=back
-
-=head1 METHODS
-
-Unless otherwise stated all methods return either a I<true> or I<false>
-value, with I<true> meaning that the operation was a success. When a method
-states that it returns a value, falure will be returned as I<undef> or an
-empty list.
-
-=over 4
-
-=item query( SEARCH [, RETURN ] )
-
-    $q = $ph->query({ name => $myname },
-		    [qw(name email schedule)]);
-    
-    foreach $handle (@{$q}) {
-	foreach $field (keys %{$handle}) {
-            $c = ${$handle}{$field}->code;
-            $v = ${$handle}{$field}->value;
-            $f = ${$handle}{$field}->field;
-            $t = ${$handle}{$field}->text;
-            print "field:[$field] [$c][$v][$f][$t]\n" ;
-	}
-    }
-
-    
-
-Search the database and return fields from all matching entries.
-
-The C<SEARCH> argument is a reference to a HASH which contains field/value
-pairs which will be passed to the Nameserver as the search criteria.
-
-C<RETURN> is optional, but if given it should be a reference to a list which
-contains field names to be returned.
-
-The alternative syntax is to pass strings instead of references, for example
-
-    $q = $ph->query('name=myname',
-		    'name email schedule');
-
-The C<SEARCH> argument is a string that is passed to the Nameserver as the 
-search criteria.
-
-C<RETURN> is optional, but if given it should be a string which will
-contain field names to be returned.
-
-Each match from the server will be returned as a HASH where the keys are the
-field names and the values are C<Net::PH:Result> objects (I<code>, I<value>, 
-I<field>, I<text>).
-
-Returns a reference to an ARRAY which contains references to HASHs, one
-per match from the server.
-
-=item change( SEARCH , MAKE )
-
-    $r = $ph->change({ email => "*.domain.name" },
-                     { schedule => "busy");
-
-Change field values for matching entries.
-
-The C<SEARCH> argument is a reference to a HASH which contains field/value
-pairs which will be passed to the Nameserver as the search criteria.
-
-The C<MAKE> argument is a reference to a HASH which contains field/value
-pairs which will be passed to the Nameserver that
-will set new values to designated fields.
-
-The alternative syntax is to pass strings instead of references, for example
-
-    $r = $ph->change('email="*.domain.name"',
-                     'schedule="busy"');
-
-The C<SEARCH> argument is a string to be passed to the Nameserver as the 
-search criteria.
-
-The C<MAKE> argument is a string to be passed to the Nameserver that
-will set new values to designated fields.
-
-Upon success all entries that match the search criteria will have
-the field values, given in the Make argument, changed.
-
-=item login( USER, PASS [, ENCRYPT ])
-
-    $r = $ph->login('username','password',1);
-
-Enter login mode using C<USER> and C<PASS>. If C<ENCRYPT> is given and
-is I<true> then the password will be used to encrypt a challenge text 
-string provided by the server, and the encrypted string will be sent back
-to the server. If C<ENCRYPT> is not given, or I<false> the the password 
-will be sent in clear text (I<this is not recommended>)
-
-=item logout()
-
-    $r = $ph->logout();
-
-Exit login mode and return to anonymous mode.
-
-=item fields( [ FIELD_LIST ] )
-
-    $fields = $ph->fields();
-    foreach $field (keys %{$fields}) {
-        $c = ${$fields}{$field}->code;
-        $v = ${$fields}{$field}->value;
-        $f = ${$fields}{$field}->field;
-        $t = ${$fields}{$field}->text;
-        print "field:[$field] [$c][$v][$f][$t]\n";
-    }
-
-Returns a reference to a HASH. The keys of the HASH are the field names
-and the values are C<Net::PH:Result> objects (I<code>, I<value>, I<field>,
-I<text>).
-
-C<FIELD_LIST> is a string that lists the fields for which info will be
-returned.
-
-=item add( FIELD_VALUES )
-
-    $r = $ph->add( { name => $name, phone => $phone });
-
-This method is used to add new entries to the Nameserver database. You
-must sucessfully call L<login> before this mathod can be used.
-
-B<Note> that this method adds new entries to the database. To modify
-an existing entry use L<change>.
-
-C<FIELD_VALUES> is a reference to a HASH which contains field/value
-pairs which will be passed to the Nameserver and will be used to 
-initialize the new entry.
-
-The alternative syntax is to pass a string instead of a reference, for example
-
-    $r = $ph->add('name=myname phone=myphone');
-
-C<FIELD_VALUES> is a string that consists of field/value pairs which the
-new entry will contain.
-
-=item delete( FIELD_VALUES )
-
-    $r = $ph->delete('name=myname phone=myphone');
-
-This method is used to delete existing entries from the Nameserver database.
-You must sucessfully call L<login> before this mathod can be used.
-
-B<Note> that this method deletes entries to the database. To modify
-an existing entry use L<change>.
-
-C<FIELD_VALUES> is a string that serves as the search criteria for the
-records to be deleted. Any entry in the database which matches this search 
-criteria will be deleted.
-
-=item id( [ ID ] )
-
-    $r = $ph->id('709');
-
-Sends C<ID> to the Namesever, which will enter this into its
-logs. If C<ID> is not given then the UID of the user running the
-process will be sent.
-
-=item status()
-
-Returns the current status of the Nameserver.
-
-=item siteinfo()
-
-    $siteinfo = $ph->siteinfo();
-    foreach $field (keys %{$siteinfo}) {
-        $c = ${$siteinfo}{$field}->code;
-        $v = ${$siteinfo}{$field}->value;
-        $f = ${$siteinfo}{$field}->field;
-        $t = ${$siteinfo}{$field}->text;
-        print "field:[$field] [$c][$v][$f][$t]\n";
-    }
-
-Returns a reference to a HASH containing information about the server's 
-site. The keys of the HASH are the field names and values are
-C<Net::PH:Result> objects (I<code>, I<value>, I<field>, I<text>).
-
-=item quit()
-
-    $r = $ph->quit();
-
-Quit the connection
-
-=back
-
-=head1 Q&A
-
-How do I get the values of a Net::PH:Result object?
-
-    foreach $handle (@{$q}) {
-        foreach $field (keys %{$handle}) {
-            $my_code  = ${$q}{$field}->code;
-            $my_value = ${$q}{$field}->value;
-            $my_field = ${$q}{$field}->field;
-            $my_text  = ${$q}{$field}->text;
-        }
-    }
-
-How do I get a count of the returned matches to my query?
-
-    $my_count = scalar(@{$query_result});
-
-How do I get the status code and message of the last C<$ph> command?
-
-    $status_code    = $ph->code;
-    $status_message = $ph->message;
-
-=head1 SEE ALSO
-
-L<Net::Cmd>
-
-=head1 AUTHORS
-
-Graham Barr <Graham.Barr@tiuk.ti.com>
-Alex Hristov <hristov@slb.com>
-
-=head1 ACKNOWLEDGEMENTS
-
-Password encryption code ported to perl by Broc Seib <bseib@purdue.edu>,
-Purdue University Computing Center.
-
-Otis Gospodnetic <otisg@panther.middlebury.edu> suggested
-passing parameters as string constants. Some queries cannot be 
-executed when passing parameters as string references.
-
-        Example: query first_name last_name email="*.domain"
-
-=head1 COPYRIGHT
-
-The encryption code is based upon cryptit.c, Copyright (C) 1988 by
-Steven Dorner and the University of Illinois Board of Trustees,
-and by CSNET.
-
-All other code is Copyright (c) 1996 Graham Barr <Graham.Barr@tiuk.ti.com>
-and Alex Hristov <hristov@slb.com>. All rights reserved. This program is
-free software; you can redistribute it and/or modify it under the same
-terms as Perl itself.
-
-=cut
 
 require 5.001;
 
@@ -324,7 +17,7 @@ use IO::Socket;
 use Net::Cmd;
 use Net::Config;
 
-$VERSION = "2.11";
+$VERSION = do { my @r=(q$Revision: 2.17 $=~/\d+/g); sprintf "%d."."%02d"x$#r,@r};
 @ISA     = qw(Exporter Net::Cmd IO::Socket::INET);
 
 sub new
@@ -332,12 +25,13 @@ sub new
  my $pkg  = shift;
  my $host = shift if @_ % 2;
  my %arg  = @_; 
- my $hosts = defined $host ? [ $host ] : $NetConfig{PH_Hosts};
+ my $hosts = defined $host ? [ $host ] : $NetConfig{ph_hosts};
  my $ph;
 
- foreach $host (@{$hosts})
+ my $h;
+ foreach $h (@{$hosts})
   {
-   $ph = $pkg->SUPER::new(PeerAddr => $host, 
+   $ph = $pkg->SUPER::new(PeerAddr => ($host = $h), 
 			  PeerPort => $arg{Port} || 'csnet-ns(105)',
 			  Proto    => 'tcp',
 			  Timeout  => defined $arg{Timeout}
@@ -348,6 +42,8 @@ sub new
 
  return undef
 	unless defined $ph;
+
+ ${*$ph}{'net_ph_host'} = $host;
 
  $ph->autoflush(1);
 
@@ -563,17 +259,17 @@ sub _arg_list
 sub add
 {
  my $ph = shift;
- my %arg = @_;
+ my $arg = @_ > 1 ? { @_ } : shift;
 
- $ph->command('add', _arg_hash(\%arg))->response == CMD_OK;
+ $ph->command('add', _arg_hash($arg))->response == CMD_OK;
 }
 
 sub delete
 {
  my $ph = shift;
- my %arg = @_;
+ my $arg = @_ > 1 ? { @_ } : shift;
 
- $ph->command('delete', _arg_hash(\%arg))->response == CMD_OK;
+ $ph->command('delete', _arg_hash($arg))->response == CMD_OK;
 }
 
 sub force
@@ -651,6 +347,8 @@ sub parse_response
     unless $_[1] =~ s/^(-?)(\d\d\d):?//o;
  ($2, $1 eq "-");
 }
+
+sub debug_text { $_[2] =~ /^(clear)/i ? "$1 ....\n" : $_[2]; }
 
 package Net::PH::Result;
 
@@ -950,3 +648,313 @@ sub print_t {
 #	EOF
 ##
 1;
+
+__END__
+
+=head1 NAME
+
+Net::PH - CCSO Nameserver Client class
+
+=head1 SYNOPSIS
+
+    use Net::PH;
+    
+    $ph = Net::PH->new("some.host.name",
+                       Port    => 105,
+                       Timeout => 120,
+                       Debug   => 0);
+
+    if($ph) {
+        $q = $ph->query({ field1 => "value1" },
+                        [qw(name address pobox)]);
+    
+        if($q) {
+        }
+    }
+    
+    # Alternative syntax
+    
+    if($ph) {
+        $q = $ph->query('field1=value1',
+                        'name address pobox');
+    
+        if($q) {
+        }
+    }
+
+=head1 DESCRIPTION
+
+C<Net::PH> is a class implementing a simple Nameserver/PH client in Perl
+as described in the CCSO Nameserver -- Server-Client Protocol. Like other
+modules in the Net:: family the C<Net::PH> object inherits methods from
+C<Net::Cmd>.
+
+=head1 CONSTRUCTOR
+
+=over 4
+
+=item new ( [ HOST ] [, OPTIONS ])
+
+    $ph = Net::PH->new("some.host.name",
+                       Port    => 105,
+                       Timeout => 120,
+                       Debug   => 0
+                      );
+
+This is the constructor for a new Net::PH object. C<HOST> is the
+name of the remote host to which a PH connection is required.
+
+If C<HOST> is not given, then the C<SNPP_Host> specified in C<Net::Config>
+will be used.
+
+C<OPTIONS> is an optional list of named options which are passed in
+a hash like fashion, using key and value pairs. Possible options are:-
+
+B<Port> - Port number to connect to on remote host.
+
+B<Timeout> - Maximum time, in seconds, to wait for a response from the
+Nameserver, a value of zero will cause all IO operations to block.
+(default: 120)
+
+B<Debug> - Enable the printing of debugging information to STDERR
+
+=back
+
+=head1 METHODS
+
+Unless otherwise stated all methods return either a I<true> or I<false>
+value, with I<true> meaning that the operation was a success. When a method
+states that it returns a value, failure will be returned as I<undef> or an
+empty list.
+
+=over 4
+
+=item query( SEARCH [, RETURN ] )
+
+    $q = $ph->query({ name => $myname },
+		    [qw(name email schedule)]);
+    
+    foreach $handle (@{$q}) {
+	foreach $field (keys %{$handle}) {
+            $c = ${$handle}{$field}->code;
+            $v = ${$handle}{$field}->value;
+            $f = ${$handle}{$field}->field;
+            $t = ${$handle}{$field}->text;
+            print "field:[$field] [$c][$v][$f][$t]\n" ;
+	}
+    }
+
+    
+
+Search the database and return fields from all matching entries.
+
+The C<SEARCH> argument is a reference to a HASH which contains field/value
+pairs which will be passed to the Nameserver as the search criteria.
+
+C<RETURN> is optional, but if given it should be a reference to a list which
+contains field names to be returned.
+
+The alternative syntax is to pass strings instead of references, for example
+
+    $q = $ph->query('name=myname',
+		    'name email schedule');
+
+The C<SEARCH> argument is a string that is passed to the Nameserver as the 
+search criteria.
+
+C<RETURN> is optional, but if given it should be a string which will
+contain field names to be returned.
+
+Each match from the server will be returned as a HASH where the keys are the
+field names and the values are C<Net::PH:Result> objects (I<code>, I<value>, 
+I<field>, I<text>).
+
+Returns a reference to an ARRAY which contains references to HASHs, one
+per match from the server.
+
+=item change( SEARCH , MAKE )
+
+    $r = $ph->change({ email => "*.domain.name" },
+                     { schedule => "busy");
+
+Change field values for matching entries.
+
+The C<SEARCH> argument is a reference to a HASH which contains field/value
+pairs which will be passed to the Nameserver as the search criteria.
+
+The C<MAKE> argument is a reference to a HASH which contains field/value
+pairs which will be passed to the Nameserver that
+will set new values to designated fields.
+
+The alternative syntax is to pass strings instead of references, for example
+
+    $r = $ph->change('email="*.domain.name"',
+                     'schedule="busy"');
+
+The C<SEARCH> argument is a string to be passed to the Nameserver as the 
+search criteria.
+
+The C<MAKE> argument is a string to be passed to the Nameserver that
+will set new values to designated fields.
+
+Upon success all entries that match the search criteria will have
+the field values, given in the Make argument, changed.
+
+=item login( USER, PASS [, ENCRYPT ])
+
+    $r = $ph->login('username','password',1);
+
+Enter login mode using C<USER> and C<PASS>. If C<ENCRYPT> is given and
+is I<true> then the password will be used to encrypt a challenge text 
+string provided by the server, and the encrypted string will be sent back
+to the server. If C<ENCRYPT> is not given, or I<false> the the password 
+will be sent in clear text (I<this is not recommended>)
+
+=item logout()
+
+    $r = $ph->logout();
+
+Exit login mode and return to anonymous mode.
+
+=item fields( [ FIELD_LIST ] )
+
+    $fields = $ph->fields();
+    foreach $field (keys %{$fields}) {
+        $c = ${$fields}{$field}->code;
+        $v = ${$fields}{$field}->value;
+        $f = ${$fields}{$field}->field;
+        $t = ${$fields}{$field}->text;
+        print "field:[$field] [$c][$v][$f][$t]\n";
+    }
+
+Returns a reference to a HASH. The keys of the HASH are the field names
+and the values are C<Net::PH:Result> objects (I<code>, I<value>, I<field>,
+I<text>).
+
+C<FIELD_LIST> is a string that lists the fields for which info will be
+returned.
+
+=item add( FIELD_VALUES )
+
+    $r = $ph->add( { name => $name, phone => $phone });
+
+This method is used to add new entries to the Nameserver database. You
+must successfully call L<login> before this method can be used.
+
+B<Note> that this method adds new entries to the database. To modify
+an existing entry use L<change>.
+
+C<FIELD_VALUES> is a reference to a HASH which contains field/value
+pairs which will be passed to the Nameserver and will be used to 
+initialize the new entry.
+
+The alternative syntax is to pass a string instead of a reference, for example
+
+    $r = $ph->add('name=myname phone=myphone');
+
+C<FIELD_VALUES> is a string that consists of field/value pairs which the
+new entry will contain.
+
+=item delete( FIELD_VALUES )
+
+    $r = $ph->delete('name=myname phone=myphone');
+
+This method is used to delete existing entries from the Nameserver database.
+You must successfully call L<login> before this method can be used.
+
+B<Note> that this method deletes entries to the database. To modify
+an existing entry use L<change>.
+
+C<FIELD_VALUES> is a string that serves as the search criteria for the
+records to be deleted. Any entry in the database which matches this search 
+criteria will be deleted.
+
+=item id( [ ID ] )
+
+    $r = $ph->id('709');
+
+Sends C<ID> to the Nameserver, which will enter this into its
+logs. If C<ID> is not given then the UID of the user running the
+process will be sent.
+
+=item status()
+
+Returns the current status of the Nameserver.
+
+=item siteinfo()
+
+    $siteinfo = $ph->siteinfo();
+    foreach $field (keys %{$siteinfo}) {
+        $c = ${$siteinfo}{$field}->code;
+        $v = ${$siteinfo}{$field}->value;
+        $f = ${$siteinfo}{$field}->field;
+        $t = ${$siteinfo}{$field}->text;
+        print "field:[$field] [$c][$v][$f][$t]\n";
+    }
+
+Returns a reference to a HASH containing information about the server's 
+site. The keys of the HASH are the field names and values are
+C<Net::PH:Result> objects (I<code>, I<value>, I<field>, I<text>).
+
+=item quit()
+
+    $r = $ph->quit();
+
+Quit the connection
+
+=back
+
+=head1 Q&A
+
+How do I get the values of a Net::PH::Result object?
+
+    foreach $handle (@{$q}) {
+        foreach $field (keys %{$handle}) {
+            $my_code  = ${$q}{$field}->code;
+            $my_value = ${$q}{$field}->value;
+            $my_field = ${$q}{$field}->field;
+            $my_text  = ${$q}{$field}->text;
+        }
+    }
+
+How do I get a count of the returned matches to my query?
+
+    $my_count = scalar(@{$query_result});
+
+How do I get the status code and message of the last C<$ph> command?
+
+    $status_code    = $ph->code;
+    $status_message = $ph->message;
+
+=head1 SEE ALSO
+
+L<Net::Cmd>
+
+=head1 AUTHORS
+
+Graham Barr <gbarr@ti.com>
+Alex Hristov <hristov@slb.com>
+
+=head1 ACKNOWLEDGMENTS
+
+Password encryption code ported to perl by Broc Seib <bseib@purdue.edu>,
+Purdue University Computing Center.
+
+Otis Gospodnetic <otisg@panther.middlebury.edu> suggested
+passing parameters as string constants. Some queries cannot be 
+executed when passing parameters as string references.
+
+        Example: query first_name last_name email="*.domain"
+
+=head1 COPYRIGHT
+
+The encryption code is based upon cryptit.c, Copyright (C) 1988 by
+Steven Dorner and the University of Illinois Board of Trustees,
+and by CSNET.
+
+All other code is Copyright (c) 1996-1997 Graham Barr <gbarr@ti.com>
+and Alex Hristov <hristov@slb.com>. All rights reserved. This program is
+free software; you can redistribute it and/or modify it under the same
+terms as Perl itself.
+
+=cut

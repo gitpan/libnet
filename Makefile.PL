@@ -1,11 +1,11 @@
 # This -*- perl -*- script makes the Makefile
-# $Id: Makefile.PL,v 1.8 1996/03/28 08:03:48 gbarr Exp $
+# $Id: Makefile.PL,v 1.5 1997/02/05 22:23:03 gbarr Exp $
 
 #--- Distribution section ---
 
 $NAME     = 'Net';
 $DISTNAME = "libnet";
-$VERSION  = "1.04";
+$VERSION  = "1.05";
 
 BEGIN { require 5.002 }
 
@@ -33,7 +33,7 @@ sub chk_version
 {
  my($pkg,$wanted,$msg) = @_;
 
- $| = 1;
+ local($|) = 1;
  print "Checking for $pkg...";
 
  eval { my $p; ($p = $pkg . ".pm") =~ s#::#/#g; require $p; };
@@ -59,24 +59,31 @@ chk_version(IO::Socket => '1.05') or
 	. "*** For Net::Cmd to work you require version 1.05, or later, of\n"
 	. "    IO/Socket.pm from CPAN/modules/by-module/IO/IO-x.x.tar.gz\n\n";
 
+chk_version(Data::Dumper => '0.01') or
+    die  "\n"
+	. "*** To be able to use the libnet modules you *MUST* have\n"
+	. "    Data::Dumper installed. You can obtain this from\n"
+	. "    CPAN/modules/by-module/Data/Data-Dumper-x.x.tar.gz\n\n";
+
 #--- Create Net::Config
 
 use IO::File;
 
-my $config = "Net/Config.pm";
+my $config_pm = "Net/Config.pm";
 
-# Use %INC and IO::File to determine hoe this machine
+# Use %INC and IO::File to determine how this machine
 # maps package names to path names
 
 foreach (keys %INC) {
- last if ($config = $_) =~ s/^IO(.)File/Net$1Config/;
+ last if ($config_pm = $_) =~ s/^IO(.)File/Net${1}Config/;
 }
 
-system($^X, 'Configure', -f $config ? '-noprompt' : '-prompt');
+system($^X, 'Configure')
+	unless -f $config_pm;
 
 #--- Write the Makefile
 
-my @clean = qw(*% *.html *.b[ac]k *.old);
+my @clean = qw(*% *.html *.b[ac]k *.old *.orig *.rej);
 
 push @clean, map { "*/$_" } @clean;
 
@@ -90,6 +97,6 @@ WriteMakefile(
 		      DIST_DEFAULT => 'all tardist',
 		     },
  
-	'clean'   => {FILES => join(" ", @clean)},
+	'clean'   => {FILES => join(" ", @clean,  )},
+	'realclean'   => {FILES => $config_pm},
 );
-

@@ -1,91 +1,447 @@
 #!/usr/local/bin/perl
+#
+# $Id: Configure,v 1.8 1997/03/04 09:22:32 gbarr Exp $
 
-use ExtUtils::MakeMaker;
+use strict;
 use IO::File;
-use Getopt::Long;
+use Getopt::Std;
+use Data::Dumper;
+use ExtUtils::MakeMaker qw(prompt);
 
-my %opt = (prompt => 1);
+use vars qw($opt_d $opt_o);
 
-GetOptions(\%opt, qw(prompt!));
+##
+##
+##
 
-my $config;
+my %cfg = ();
 
-foreach (keys %INC)
+my($config_pm,$msg,$ans,$def,$have_old);
+
+##
+##
+##
+
+sub valid_host
+{
+ my $h = shift;
+
+ defined($h) && (($cfg{'test_exist'} == 0) || gethostbyname($h));
+}
+
+##
+##
+##
+
+sub test_hostnames (\@)
+{
+ my $hlist = shift;
+ my @h = ();
+ my $host;
+ my $err = 0;
+
+ foreach $host (@$hlist)
+  {
+   if(valid_host($host))
+    {
+     push(@h, $host);
+     next;
+    }
+   warn "Bad hostname: '$host'\n";
+   $err++;
+  }
+ @$hlist = @h;
+ $err ? join(" ",@h) : undef;
+}
+
+##
+##
+##
+
+sub Prompt
+{
+ my($prompt,$def) = @_;
+
+ $def = "" unless defined $def;
+
+ chomp($prompt);
+
+ if($opt_d)
+  {
+   print $prompt,," [",$def,"]\n";
+   return $def;
+  }
+ prompt($prompt,$def);
+}
+
+##
+##
+##
+
+sub get_host_list
+{
+ my($prompt,$def) = @_;
+
+ $def = join(" ",@$def) if ref($def);
+
+ my @hosts;
+
+ do
+  {
+   my $ans = Prompt($prompt,$def);
+
+   $ans =~ s/(\A\s+|\s+\Z)//g;
+
+   @hosts = split(/\s+/, $ans);
+  }
+ while(@hosts && defined($def = test_hostnames(@hosts)));
+
+ \@hosts;
+}
+
+##
+##
+##
+
+sub get_hostname
+{
+ my($prompt,$def) = @_;
+
+ my $host;
+
+ while(1)
+  {
+   my $ans = Prompt($prompt,$def);
+   $host = ($ans =~ /(\S*)/)[0];
+   last
+	if(!length($host) || valid_host($host));
+
+   $def =""
+	if $def eq $host;
+
+   print <<"EDQ";
+
+*** ERROR:
+    Hostname `$host' does not seem to exist, please enter again
+    or a single space to clear any default
+
+EDQ
+  }
+
+ length $host
+	? $host
+	: undef;
+}
+
+##
+##
+##
+
+sub get_bool ($$)
+{
+ my($prompt,$def) = @_;
+
+ chomp($prompt);
+
+ my $val = Prompt($prompt,$def ? "yes" : "no");
+
+ $val =~ /^y/i ? 1 : 0;
+}
+
+##
+##
+##
+
+sub default_hostname
+{
+ my $host;
+ my @host;
+
+ foreach $host (@_)
+  {
+   if(defined($host) && valid_host($host))
+    {
+     return $host
+	unless wantarray;
+     push(@host,$host);
+    }
+  }
+
+ return wantarray ? @host : undef;
+}
+
+##
+##
+##
+
+getopts('do:');
+
+unless(defined($config_pm = $opt_o))
  {
-  last if ($config = $_) =~ s/^IO(.)File/Net$1Config/;
+  foreach (keys %INC)
+   {
+    last if ($config_pm = $_) =~ s/^IO(.)File/Net$1Config/;
+   }
  }
 
-defined($config) && -f $config
-	? require $config
+die "Cannot determine .pm filename for Net::Config"
+	unless defined($config_pm);
+
+push(@INC,".");
+
+$have_old = -f $config_pm
+	? require $config_pm
 	: eval { require Net::Config };
 
-my %config = ();
+%cfg = %Net::Config::NetConfig
+	if $have_old;
 
-%config = %Net::Config::NetConfig
-	if defined %Net::Config::NetConfig;
+map { $cfg{lc $_} = $cfg{$_}; delete $cfg{$_} if /[A-Z]/ } keys %cfg;
 
-my $def;
+$cfg{'test_exist'} = 1 unless exists $cfg{'test_exist'};
+$cfg{'test_hosts'} = 1 unless exists $cfg{'test_hosts'};
 
-sub config_host_list
-{
- my($key,$name) = @_;
+#---------------------------------------------------------------------------
 
- my $def = exists $config{$key} ? join(" ", @{$config{$key}}) : "";
- my $val = $opt{prompt}
-		? prompt("Enter a list of avaliable $name Hosts :",$def)
-		: $def;
- my $res = [];
+if(not(-f $config_pm) && $have_old && not($opt_d))
+ {
+  $msg = <<EDQ;
 
- $val =~ s/(\A\s+|\s+\Z)//g;
+Ah, I see you already have installed libnet before.
 
- @$res = split(/\s+/, $val)
-	if(length $val);
+Do you want to modify/update your configuration (y|n) ?
+EDQ
 
- $config{$key} = $res;
-}
+ $opt_d = 1
+	unless get_bool($msg,0);
+ }
 
-sub config_host
-{
- my($key,$name) = @_;
+#---------------------------------------------------------------------------
 
- my $def = exists $config{$key} ? $config{$key} : "";
- my $val = $opt{prompt}
-		? prompt("Enter your $name :",$def)
-		: $def;
+$msg = <<EDQ;
 
- $config{$key} = ($val =~ /(\S+)/)[0];
-}
+This script will prompt you to enter hostnames that can be used as
+defaults for some of the modules in the libnet distribution.
 
-print "\n\nThe following questions all require a list of host names,\n"
-         ."separated with spaces. If you do not have a host avaliable\n"
-         ."for any of the services, then enter a single space, followed\n"
-         ."by <CR>. To accept the default, hit <CR>\n\n" if $opt{prompt};
+To ensure that you do not enter an invalid hostname, I can perform a
+lookup on each hostname you enter. If your internet connection is via
+a dialup line then you may not want me to perform these lookups, as
+it will require you to be on-line.
 
-config_host_list(qw(NNTP_Hosts NNTP));
-config_host_list(qw(SMTP_Hosts SMTP));
-config_host_list(qw(POP3_Hosts POP3));
-config_host_list(qw(SNPP_Hosts SNPP));
-config_host_list(qw(PH_Hosts PH));
+Do you want me to perform hostname lookups (y|n) ?
+EDQ
 
-print "\n\nThe following questions all require a single host name\n"
-          ."If you do not have a host avaliable for any of the services,\n"
-          ."then enter a single space, followed by <CR>\n\n" if $opt{prompt};
+$cfg{'test_exist'} = get_bool($msg, $cfg{'test_exist'});
 
-config_host('FTP_FireWall', 'FTP firewall host name');
-config_host('INET_Domain', 'local internet domain name');
+print <<EDQ unless $cfg{'test_exist'};
+
+*** WARNING *** WARNING *** WARNING *** WARNING *** WARNING ***
+
+OK I will not check if the hostnames you give are valid
+so be very cafeful
+
+*** WARNING *** WARNING *** WARNING *** WARNING *** WARNING ***
+EDQ
 
 
-my $fh = IO::File->new($config, "w") or
-		die "Cannot create `$file': $!";
+#---------------------------------------------------------------------------
 
-print "Creating $config ...\n";
+print <<EDQ;
 
-$fh->print("# This file was autogenerated by $0\n");
-$fh->print("# Any modifications made here will be lost\n");
-$fh->print("# ",`date`);
+The following questions all require a list of host names, separated
+with spaces. If you do not have a host avaliable for any of the
+services, then enter a single space, followed by <CR>. To accept the
+default, hit <CR>
 
-$fh->print(<<'ESQ');
+EDQ
 
+$msg = 'Enter a list of avaliable NNTP hosts :';
+
+$def = $cfg{'nntp_hosts'} ||
+	[ default_hostname($ENV{NNTPSERVER},$ENV{NEWSHOST},'news') ];
+
+$cfg{'nntp_hosts'} = get_host_list($msg,$def);
+
+#---------------------------------------------------------------------------
+
+$msg = 'Enter a list of avaliable SMTP hosts :';
+
+$def = $cfg{'smtp_hosts'} ||
+	[ default_hostname(split(/:/,$ENV{SMTPHOSTS} || ""), 'mailhost') ];
+
+$cfg{'smtp_hosts'} = get_host_list($msg,$def);
+
+#---------------------------------------------------------------------------
+
+$msg = 'Enter a list of avaliable POP3 hosts :';
+
+$def = $cfg{'pop3_hosts'} || [];
+
+$cfg{'pop3_hosts'} = get_host_list($msg,$def);
+
+#---------------------------------------------------------------------------
+
+$msg = 'Enter a list of avaliable SNPP hosts :';
+
+$def = $cfg{'snpp_hosts'} || [];
+
+$cfg{'snpp_hosts'} = get_host_list($msg,$def);
+
+#---------------------------------------------------------------------------
+
+$msg = 'Enter a list of avaliable PH Hosts   :'  ;
+
+$def = $cfg{'ph_hosts'} ||
+	[ default_hostname('dirserv') ];
+
+$cfg{'ph_hosts'}   =  get_host_list($msg,$def);
+
+#---------------------------------------------------------------------------
+
+$msg = 'Enter a list of avaliable TIME Hosts   :'  ;
+
+$def = $cfg{'time_hosts'} || [];
+
+$cfg{'time_hosts'} = get_host_list($msg,$def);
+
+#---------------------------------------------------------------------------
+
+$msg = 'Enter a list of avaliable DAYTIME Hosts   :'  ;
+
+$def = $cfg{'daytime_hosts'} || $cfg{'time_hosts'};
+
+$cfg{'daytime_hosts'} = get_host_list($msg,$def);
+
+#---------------------------------------------------------------------------
+
+$msg = <<EDQ;
+
+Some companies access the internet via a firewall machine, and all
+FTP access must be dove via this machine.
+
+If to gain FTP access to a machine beyond a firewall, you have to use
+a FTP proxy machine and login as username\@remote.host then enter
+the name of that gateway here.
+
+FTP proxy hostname :
+EDQ
+
+$cfg{'ftp_firewall'} ||= $ENV{FTP_FIREWALL};
+
+$cfg{'ftp_firewall'} = get_hostname($msg,$cfg{'ftp_firewall'});
+
+#---------------------------------------------------------------------------
+
+###$msg =<<EDQ;
+###
+###SOCKS is a commonly used firewall protocol. If you use SOCKS firewalls
+###then enter a list of hostames
+###
+###Enter a list of avaliable SOCKS hosts :
+###EDQ
+###
+###$def = $cfg{'socks_hosts'} ||
+###	[ default_hostname($ENV{SOCKS5_SERVER},
+###			   $ENV{SOCKS_SERVER},
+###			   $ENV{SOCKS4_SERVER}) ];
+###
+###$cfg{'socks_hosts'}   =  get_host_list($msg,$def);
+
+#---------------------------------------------------------------------------
+
+print <<EDQ;
+
+Normally when FTP needs a data connection the client tells the server
+a port to connect to, and the server initiates a connection to the client.
+
+Some setups, in particular firewall setups, can/do not work using this
+protocol. In these situations the client must make the connection to the
+server, this is called a passive transfer.
+EDQ
+
+$msg = "\nShould all FTP connections via a firewall/proxy be passive (y|n) ?";
+
+$cfg{'ftp_ext_passive'} ||= 0;
+
+$cfg{'ftp_ext_passive'} = get_bool($msg,$cfg{'ftp_ext_passive'});
+
+
+$cfg{'ftp_int_passive'} ||= 0;
+
+$msg = "\nShould all other FTP connections be passive (y|n) ?";
+
+$cfg{'ftp_int_passive'} = get_bool($msg,$cfg{'ftp_int_passive'});
+
+
+#---------------------------------------------------------------------------
+
+$cfg{'inet_domain'} ||= $ENV{LOCALDOMAIN};
+
+if(!defined($cfg{'inet_domain'})
+	&& $cfg{'test_exist'}		# Net::Domain does hostname lookups
+	&& -f "Net/Domain.pm")
+ {
+  require "Net/Domain.pm";
+  $cfg{'inet_domain'} = Net::Domain::hostdomain();
+ }
+
+$ans = Prompt("\nWhat is your local internet domain name :",
+		$cfg{'inet_domain'});
+
+$cfg{'inet_domain'} = ($ans =~ /(\S+)/)[0];
+
+#---------------------------------------------------------------------------
+
+$msg = <<EDQ;
+
+If you specified some default hosts above, it is possible for me to
+do some basic tests when you run `make test'
+
+This will cause `make test' to be quite a bit slower and, if your
+internet connection is via dialup, will require you to be on-line
+unless the hosts are local.
+
+Do you want me to run these tests (y|n) ?
+EDQ
+
+$cfg{'test_hosts'} = get_bool($msg,$cfg{'test_hosts'});
+
+#---------------------------------------------------------------------------
+
+$msg = <<EDQ;
+
+To allow Net::FTP to be tested I will need a hostname. This host
+should allow anonymous access and have a /pub directory
+
+What host can I use :
+EDQ
+
+$cfg{'ftp_testhost'} = get_hostname($msg,$cfg{'ftp_testhost'})
+	if $cfg{'test_hosts'};
+
+
+print "\n";
+
+#---------------------------------------------------------------------------
+
+my $fh = IO::File->new($config_pm, "w") or
+	die "Cannot create `$config_pm': $!";
+
+print "Writing $config_pm\n";
+
+$fh->print(<DATA>,
+	   Data::Dumper->Dump([\%cfg],['*NetConfig']),
+	   "\n1;\n"
+	  );
+
+$fh->close;
+
+############################################################################
+############################################################################
+
+exit 0;
+
+__DATA__
 package Net::Config;
 
 require Exporter;
@@ -95,35 +451,65 @@ use strict;
 @EXPORT = qw(%NetConfig);
 @ISA = qw(Exporter);
 
-%NetConfig = (
-ESQ
+sub set
+{
+ my $pkg = shift if @_ % 2;
+ my %cfg = @_;
 
-my($k,$v);
-while(($k,$v) = each %config)
- {
-  my($r,$rv);
+ return unless @_;
 
-  next unless defined $v;
+ # Only require these modules if we need to
+ require Data::Dumper;
+ require IO::File;
+ require Carp;
+ require File::Copy;
+    
+ my $mod = $INC{'Net/Config.pm'} or
+	Carp::croak "Can't find myself";
 
-  if(ref($v))
-   {
-    my @r = grep { length } map { (/(\S+)/)[0] } @$v;
-#    next unless @r;
-    $rv = join(" ", @{$v});
-    $r = @r ? '[qw(' . $rv . ')]' : '[]';
-   }
-  else
-   {
-    $rv = ($v =~ /(\S+)/)[0];
-#    next unless length $rv;
-#    $r = '"' . $rv . '"';
-    $r = length($rv) ? '"' . $rv . '"' : 'undef';
-   }
+ my $bak = $mod . "~";
 
-  print STDERR sprintf(" %-16s => %s\n",$k,$rv);
+ print "Updating $mod...\n";
 
-  $fh->printf(" %-16s => %s,\n",$k,$r);
- }
+ File::Copy::copy($mod,$bak) or
+	Carp::croak "Cannot create backup file $bak: $!";
 
-$fh->print( ");\n\n1;\n" );
-$fh->close;
+ print "...backup at $bak\n";
+
+ my $old = new IO::File $bak,"r" or
+	Carp::croak "Can't open $bak: $!";
+
+ my $new = new IO::File $mod,"w" or
+	Carp::croak "Can't open $mod: $!";
+
+ # If we fail below, then we must restore from backup
+ local $SIG{'__DIE__'} = sub {
+        print "Restoring $mod from backup!!\n";
+        unlink $mod;
+        rename $bak, $mod;
+        print "Done.\n";
+        exit 1;
+       };
+
+ %NetConfig = (%NetConfig, %cfg);
+
+ while (<$old>)
+  {
+   last if /^%NetConfig/;
+   $new->print($_);
+  }
+
+ $new->print ( Data::Dumper->Dump([\%NetConfig],['*NetConfig']) );
+
+ $new->print("\n1;\n");
+
+ close $old;
+ close $new;
+}
+
+# WARNING  WARNING  WARNING  WARNING  WARNING  WARNING  WARNING
+# WARNING  WARNING  WARNING  WARNING  WARNING  WARNING  WARNING
+#
+# Below this line is auto-generated, *ANY* changes will be lost
+
+

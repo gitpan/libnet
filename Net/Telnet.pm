@@ -1,42 +1,6 @@
 
 package	Net::Telnet;
 
-=head1 NAME
-
-Net::Telnet - Defines constants for the telnet protocol
-
-=head1 SYNOPSIS
-
-    use Telnet qw(TELNET_IAC TELNET_DO TELNET_DONT);
-
-=head1 DESCRIPTION
-
-This module is B<VERY> preliminary as I am not 100% sure how it should
-be implemented.
-
-Currently it just exports constants used in the telnet protocol.
-
-Should it contain sub's for packing and unpacking commands ?
-
-Please feel free to send me any suggestions
-
-=head1 NOTE
-
-This is not an implementation of the 'telnet' command but of the telnet
-protocol as defined in RFC854
-
-=head1 AUTHOR
-
-Graham Barr <Graham.Barr@tiuk.ti.com>
-
-=head1 COPYRIGHT
-
-Copyright (c) 1995 Graham Barr. All rights reserved. This program is free
-software; you can redistribute it and/or modify it under the same terms
-as Perl itself.
-
-=cut
-
 use     strict;
 use     vars qw(@ISA $VERSION @EXPORT_OK);
 require	Exporter;
@@ -247,3 +211,41 @@ sub telnet_pack {
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+Net::Telnet - Defines constants for the telnet protocol
+
+=head1 SYNOPSIS
+
+    use Telnet qw(TELNET_IAC TELNET_DO TELNET_DONT);
+
+=head1 DESCRIPTION
+
+This module is B<VERY> preliminary as I am not 100% sure how it should
+be implemented.
+
+Currently it just exports constants used in the telnet protocol.
+
+Should it contain sub's for packing and unpacking commands ?
+
+Please feel free to send me any suggestions
+
+=head1 NOTE
+
+This is not an implementation of the 'telnet' command but of the telnet
+protocol as defined in RFC854
+
+=head1 AUTHOR
+
+Graham Barr <gbarr@ti.com>
+
+=head1 COPYRIGHT
+
+Copyright (c) 1995-1997 Graham Barr. All rights reserved.
+This program is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut

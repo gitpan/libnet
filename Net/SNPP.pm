@@ -1,125 +1,10 @@
 # Net::SNPP.pm
 #
-# Copyright (c) 1995 Graham Barr <Graham.Barr@tiuk.ti.com>. All rights
-# reserved. This program is free software; you can redistribute it and/or
+# Copyright (c) 1995-1997 Graham Barr <gbarr@ti.com>. All rights reserved.
+# This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl itself.
 
 package Net::SNPP;
-
-=head1 NAME
-
-Net::SNPP - Simple Network Pager Protocol Client
-
-=head1 SYNOPSIS
-
-    use Net::SNPP;
-    
-    # Constructors
-    $snpp = Net::SNPP->new('snpphost');
-    $snpp = Net::SNPP->new('snpphost', Timeout => 60);
-
-=head1 NOTE
-
-This module is not complete, yet !
-
-=head1 DESCRIPTION
-
-This module implements a client interface to the SNPP protocol, enabling
-a perl5 application to talk to SNPP servers. This documentation assumes
-that you are familiar with the SNPP protocol described in RFC1861.
-
-A new Net::SNPP object must be created with the I<new> method. Once
-this has been done, all SNPP commands are accessed through this object.
-
-=head1 EXAMPLES
-
-This example will send a pager message in one hour saying "Your lunch is ready"
-
-    #!/usr/local/bin/perl -w
-    
-    use Net::SNPP;
-    
-    $snpp = Net::SNPP->new('snpphost');
-    
-    $snpp->send( Pager   => $some_pager_number,
-	         Message => "Your lunch is ready",
-	         Alert   => 1,
-	         Hold    => time + 3600, # lunch ready in 1 hour :-)
-	       ) || die $snpp->message;
-    
-    $snpp->quit;
-
-=head1 CONSTRUCTOR
-
-=over 4
-
-=item new ( [ HOST, ] [ OPTIONS ] )
-
-This is the constructor for a new Net::SNPP object. C<HOST> is the
-name of the remote host to which a SNPP connection is required.
-
-If C<HOST> is not given, then the C<SNPP_Host> specified in C<Net::Config>
-will be used.
-
-C<OPTIONS> are passed in a hash like fasion, using key and value pairs.
-Possible options are:
-
-B<Timeout> - Maximum time, in seconds, to wait for a response from the
-SNPP server (default: 120)
-
-B<Debug> - Enable debugging information
-
-
-Example:
-
-
-    $snpp = Net::SNPP->new('snpphost',
-			   Debug => 1,
-			  );
-
-=head1 METHODS
-
-Unless otherwise stated all methods return either a I<true> or I<false>
-value, with I<true> meaning that the operation was a success. When a method
-states that it returns a value, falure will be returned as I<undef> or an
-empty list.
-
-=over 4
-
-=item reset ()
-
-=item help ()
-
-Request help text from the server. Returns the text or undef upon failure
-
-=item quit ()
-
-Send the QUIT command to the remote SNPP server and close the socket connection.
-
-=back
-
-=head1 EXPORTS
-
-C<Net::SNPP> exports all that C<Net::CMD> exports, plus three more subroutines
-that can bu used to compare against the result of C<status>. These are :-
-C<CMD_2WAYERROR>, C<CMD_2WAYOK>, and C<CMD_2WAYQUEUED>.
-
-=head1 SEE ALSO
-
-L<Net::Cmd>
-RFC1861
-
-=head1 AUTHOR
-
-Graham Barr <Graham.Barr@tiuk.ti.com>
-
-=head1 COPYRIGHT
-
-Copyright (c) 1995 Graham Barr. All rights reserved. This program is free
-software; you can redistribute it and/or modify it under the same terms
-as Perl itself.
-
-=cut
 
 require 5.001;
 
@@ -131,7 +16,7 @@ use IO::Socket;
 use Net::Cmd;
 use Net::Config;
 
-$VERSION = "1.04";
+$VERSION = do { my @r=(q$Revision: 1.9 $=~/\d+/g); sprintf "%d."."%02d"x$#r,@r};
 @ISA     = qw(Net::Cmd IO::Socket::INET);
 @EXPORT  = qw(CMD_2WAYERROR CMD_2WAYOK CMD_2WAYQUEUED);
 
@@ -172,12 +57,13 @@ sub new
  my $type = ref($self) || $self;
  my $host = shift if @_ % 2;
  my %arg  = @_; 
- my $hosts = defined $host ? [ $host ] : $NetConfig{SNPP_Hosts};
+ my $hosts = defined $host ? [ $host ] : $NetConfig{snpp_hosts};
  my $obj;
 
+ my $h;
  foreach $host (@{$hosts})
   {
-   $obj = $type->SUPER::new(PeerAddr => $host, 
+   $obj = $type->SUPER::new(PeerAddr => ($host = $h), 
 			    PeerPort => $arg{Port} || 'snpp(444)',
 			    Proto    => 'tcp',
 			    Timeout  => defined $arg{Timeout}
@@ -188,6 +74,8 @@ sub new
 
  return undef
 	unless defined $obj;
+
+ ${*$obj}{'net_snpp_host'} = $host;
 
  $obj->autoflush(1);
 
@@ -388,3 +276,119 @@ sub _SUBJ { shift->command("SUBJ", @_)->response()  == CMD_OK }
 
 
 1;
+__END__
+
+=head1 NAME
+
+Net::SNPP - Simple Network Pager Protocol Client
+
+=head1 SYNOPSIS
+
+    use Net::SNPP;
+    
+    # Constructors
+    $snpp = Net::SNPP->new('snpphost');
+    $snpp = Net::SNPP->new('snpphost', Timeout => 60);
+
+=head1 NOTE
+
+This module is not complete, yet !
+
+=head1 DESCRIPTION
+
+This module implements a client interface to the SNPP protocol, enabling
+a perl5 application to talk to SNPP servers. This documentation assumes
+that you are familiar with the SNPP protocol described in RFC1861.
+
+A new Net::SNPP object must be created with the I<new> method. Once
+this has been done, all SNPP commands are accessed through this object.
+
+=head1 EXAMPLES
+
+This example will send a pager message in one hour saying "Your lunch is ready"
+
+    #!/usr/local/bin/perl -w
+    
+    use Net::SNPP;
+    
+    $snpp = Net::SNPP->new('snpphost');
+    
+    $snpp->send( Pager   => $some_pager_number,
+	         Message => "Your lunch is ready",
+	         Alert   => 1,
+	         Hold    => time + 3600, # lunch ready in 1 hour :-)
+	       ) || die $snpp->message;
+    
+    $snpp->quit;
+
+=head1 CONSTRUCTOR
+
+=over 4
+
+=item new ( [ HOST, ] [ OPTIONS ] )
+
+This is the constructor for a new Net::SNPP object. C<HOST> is the
+name of the remote host to which a SNPP connection is required.
+
+If C<HOST> is not given, then the C<SNPP_Host> specified in C<Net::Config>
+will be used.
+
+C<OPTIONS> are passed in a hash like fashion, using key and value pairs.
+Possible options are:
+
+B<Timeout> - Maximum time, in seconds, to wait for a response from the
+SNPP server (default: 120)
+
+B<Debug> - Enable debugging information
+
+
+Example:
+
+
+    $snpp = Net::SNPP->new('snpphost',
+			   Debug => 1,
+			  );
+
+=head1 METHODS
+
+Unless otherwise stated all methods return either a I<true> or I<false>
+value, with I<true> meaning that the operation was a success. When a method
+states that it returns a value, failure will be returned as I<undef> or an
+empty list.
+
+=over 4
+
+=item reset ()
+
+=item help ()
+
+Request help text from the server. Returns the text or undef upon failure
+
+=item quit ()
+
+Send the QUIT command to the remote SNPP server and close the socket connection.
+
+=back
+
+=head1 EXPORTS
+
+C<Net::SNPP> exports all that C<Net::CMD> exports, plus three more subroutines
+that can bu used to compare against the result of C<status>. These are :-
+C<CMD_2WAYERROR>, C<CMD_2WAYOK>, and C<CMD_2WAYQUEUED>.
+
+=head1 SEE ALSO
+
+L<Net::Cmd>
+RFC1861
+
+=head1 AUTHOR
+
+Graham Barr <gbarr@ti.com>
+
+=head1 COPYRIGHT
+
+Copyright (c) 1995-1997 Graham Barr. All rights reserved.
+This program is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut

@@ -1,7 +1,6 @@
 ChangeLog
 Configure
 Hostname.pm.eg			Example replacement for Hostname.pm
-INSTALL
 MANIFEST
 Makefile.PL
 Net/Cmd.pm			(v2.07) 
@@ -17,14 +16,17 @@ Net/SNPP.pm			(v1.03) Simple Network Pager Protocol Client
 Net/Telnet.pm			(v2.01) 
 Net/Time.pm			(v2.01) time & nettime protocols
 README
-README.CPAN
-README.DEBUG
 demos/ftp
 demos/inetd
 demos/nntp
+demos/nntp.mirror
 demos/pop3
 demos/smtp.self
 demos/snpp
 demos/time
+t/ftp.t
 t/hostname.t
+t/nntp.t
+t/ph.t
 t/require.t
+t/smtp.t

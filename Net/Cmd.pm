@@ -1,170 +1,10 @@
 # Net::Cmd.pm
 #
-# Copyright (c) 1995 Graham Barr <Graham.Barr@tiuk.ti.com>. All rights
-# reserved. This program is free software; you can redistribute it and/or
+# Copyright (c) 1995-1997 Graham Barr <gbarr@ti.com>. All rights reserved.
+# This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl itself.
 
 package Net::Cmd;
-
-=head1 NAME
-
-Net::Cmd - Network Command class (as used by FTP, SMTP etc)
-
-=head1 SYNOPSIS
-
-    use Net::Cmd;
-    
-    @ISA = qw(Net::Cmd);
-
-=head1 DESCRIPTION
-
-C<Net::Cmd> is a collection of methods that can be inherited by a sub class
-of C<IO::Handle>. These methods implement the functionality required for a
-command based protocol, for example FTP and SMTP.
-
-=head1 USER METHODS
-
-These methods provide a user interface to the C<Net::Cmd> object.
-
-=over 4
-
-=item debug ( VALUE )
-
-Set the level of debug information for this object. If C<VALUE> is not given
-then the current state is returned. Otherwise the state is changed to 
-C<VALUE> and the previous state returned. 
-
-Set the level of debug information for this object. If no argument is
-given then the current state is returned. Otherwise the state is
-changed to C<$value>and the previous state returned.  Different packages
-may implement different levels of debug but, a  non-zero value result in
-copies of all commands and responses also being sent to STDERR.
-
-If C<VALUE> is C<undef> then the debug level will be set to the default
-debug level for the class.
-
-This method can also be called as a I<static> method to set/get the default
-debug level for a given class.
-
-=item message ()
-
-Returns the text message returned from the last command
-
-=item code ()
-
-Returns the 3-digit code from the last command. If a command is pending
-then the value 0 is returned
-
-=item ok ()
-
-Returns non-zero if the last code value was greater than zero and
-less than 400. This holds true for most command servers. Servers
-where this does not hold may override this method.
-
-=item status ()
-
-Returns the most significant digit of the current status code. If a command
-is pending then C<CMD_PENDING> is returned.
-
-=item datasend ( DATA )
-
-Send data to the remote server, converting LF to CRLF. Any line starting
-with a '.' will be prefixed with another '.'.
-C<DATA> may be an array or a reference to an array.
-
-=item dataend ()
-
-End the sending of data to the remote server. This is done by ensureing that
-the data already sent ends with CRLF then sending '.CRLF' to end the
-transmission. Once this data has been sent C<dataend> calls C<response> and
-returns true if C<response> returns CMD_OK.
-
-=back
-
-=head1 CLASS METHODS
-
-These methods are not intended to be called by the user, but used or 
-over-ridden by a sub-class of C<Net::Cmd>
-
-=over 4
-
-=item debug_print ( DIR, TEXT )
-
-Print debugging information. C<DIR> denotes the direction I<true> being
-data being sent to the server. Calls C<debug_text> before printing to
-STDERR.
-
-=item debug_text ( TEXT )
-
-This method is called to print debugging information. TEXT is
-the text being sent. The method should return the text to be printed
-
-This is primarily meant for the use of modules such as FTP where passwords
-are sent, but we do not want to display them in the debugging information.
-
-=item command ( CMD [, ARGS, ... ])
-
-Send a command to the command server. All arguments a first joined with
-a space character and CRLF is appended, this string is then sent to the
-command server.
-
-Returns undef upon failure
-
-=item unsupported ()
-
-Sets the status code to 580 and the response text to 'Unsupported command'.
-Returns zero.
-
-=item responce ()
-
-Obtain a responce from the server. Upon success the most significant digit
-of the status code is returned. Upon failure, timeout etc., I<undef> is
-returned.
-
-=item parse_response ( TEXT )
-
-This method is called by C<response> as a method with one argument. It should
-return an array of 2 values, the 3-digit status code and a flag which is true
-when this is part of a multi-line response and this line is not the list.
-
-=item getline ()
-
-Retreive one line, delimited by CRLF, from the remote server. Returns I<undef>
-upon failure.
-
-B<NOTE>: If you do use this method for any reason, please remember to add
-some C<debug_print> calls into your method.
-
-=item ungetline ( TEXT )
-
-Unget a line of text from the server.
-
-=item read_until_dot ()
-
-Read data from the remote server until a line consisting of a single '.'.
-Any lines starting with '..' will have one of the '.'s removed.
-
-Returns a reference to a list containing the lines, or I<undef> upon failure.
-
-=back
-
-=head1 EXPORTS
-
-C<Net::Cmd> exports six subroutines, five of these, C<CMD_INFO>, C<CMD_OK>,
-C<CMD_MORE>, C<CMD_REJECT> and C<CMD_ERROR> ,correspond to possible results
-of C<response> and C<status>. The sixth is C<CMD_PENDING>.
-
-=head1 AUTHOR
-
-Graham Barr <Graham.Barr@tiuk.ti.com>
-
-=head1 COPYRIGHT
-
-Copyright (c) 1995 Graham Barr. All rights reserved. This program is free
-software; you can redistribute it and/or modify it under the same terms
-as Perl itself.
-
-=cut
 
 require 5.001;
 require Exporter;
@@ -173,7 +13,7 @@ use strict;
 use vars qw(@ISA @EXPORT $VERSION);
 use Carp;
 
-$VERSION = "2.07";
+$VERSION = "2.08";
 @ISA     = qw(Exporter);
 @EXPORT  = qw(CMD_INFO CMD_OK CMD_MORE CMD_REJECT CMD_ERROR CMD_PENDING);
 
@@ -285,12 +125,15 @@ sub code
 
  my $cmd = shift;
 
+ ${*$cmd}{'net_cmd_code'} = "000"
+	unless exists ${*$cmd}{'net_cmd_code'};
+
  ${*$cmd}{'net_cmd_code'};
 }
 
 sub status
 {
- @_ == 1 or croak 'usage: $obj->code()';
+ @_ == 1 or croak 'usage: $obj->status()';
 
  my $cmd = shift;
 
@@ -299,7 +142,7 @@ sub status
 
 sub set_status
 {
- @_ == 3 or croak 'usage: $obj->set_status( CODE, MESSAGE)';
+ @_ == 3 or croak 'usage: $obj->set_status(CODE, MESSAGE)';
 
  my $cmd = shift;
  my($code,$resp) = @_;
@@ -328,7 +171,7 @@ sub command
    $cmd->debug_print(1,$str)
 	if($cmd->debug);
 
-   ${*$cmd}{'net_cmd_resp'} = [];	# the responce
+   ${*$cmd}{'net_cmd_resp'} = [];      # the response
    ${*$cmd}{'net_cmd_code'} = "000";	# Made this one up :-)
   }
 
@@ -417,7 +260,7 @@ sub ungetline
 sub parse_response
 {
  return ()
-    unless $_[1] =~ s/^(\d\d\d)(.)//o;
+    unless $_[1] =~ s/^(\d\d\d)(.?)//o;
  ($1, $2 eq "-");
 }
 
@@ -442,12 +285,12 @@ sub response
      last;
     }
 
+   ${*$cmd}{'net_cmd_code'} = $code;
+
    push(@{${*$cmd}{'net_cmd_resp'}},$str);
 
    last unless($more);
   } 
-
- ${*$cmd}{'net_cmd_code'} = $code;
 
  substr($code,0,1);
 }
@@ -464,7 +307,7 @@ sub read_until_dot
    $cmd->debug_print(0,$str)
      if ($cmd->debug & 4);
 
-   last if($str =~ /^\.\n/o);
+   last if($str =~ /^\.\r?\n/o);
 
    $str =~ s/^\.\././o;
 
@@ -494,7 +337,7 @@ sub datasend
  ${*$cmd}{'net_cmd_lastch'} ||= " ";
  $line = ${*$cmd}{'net_cmd_lastch'} . $line;
 
- $line =~ s/(?=\012\.)/./sgo;
+ $line =~ s/(\012\.)/$1./sog;
 
  ${*$cmd}{'net_cmd_lastch'} = substr($line,-1,1);
 
@@ -535,3 +378,166 @@ sub dataend
 }
 
 1;
+
+__END__
+
+
+=head1 NAME
+
+Net::Cmd - Network Command class (as used by FTP, SMTP etc)
+
+=head1 SYNOPSIS
+
+    use Net::Cmd;
+    
+    @ISA = qw(Net::Cmd);
+
+=head1 DESCRIPTION
+
+C<Net::Cmd> is a collection of methods that can be inherited by a sub class
+of C<IO::Handle>. These methods implement the functionality required for a
+command based protocol, for example FTP and SMTP.
+
+=head1 USER METHODS
+
+These methods provide a user interface to the C<Net::Cmd> object.
+
+=over 4
+
+=item debug ( VALUE )
+
+Set the level of debug information for this object. If C<VALUE> is not given
+then the current state is returned. Otherwise the state is changed to 
+C<VALUE> and the previous state returned. 
+
+Set the level of debug information for this object. If no argument is
+given then the current state is returned. Otherwise the state is
+changed to C<$value>and the previous state returned.  Different packages
+may implement different levels of debug but, a  non-zero value result in
+copies of all commands and responses also being sent to STDERR.
+
+If C<VALUE> is C<undef> then the debug level will be set to the default
+debug level for the class.
+
+This method can also be called as a I<static> method to set/get the default
+debug level for a given class.
+
+=item message ()
+
+Returns the text message returned from the last command
+
+=item code ()
+
+Returns the 3-digit code from the last command. If a command is pending
+then the value 0 is returned
+
+=item ok ()
+
+Returns non-zero if the last code value was greater than zero and
+less than 400. This holds true for most command servers. Servers
+where this does not hold may override this method.
+
+=item status ()
+
+Returns the most significant digit of the current status code. If a command
+is pending then C<CMD_PENDING> is returned.
+
+=item datasend ( DATA )
+
+Send data to the remote server, converting LF to CRLF. Any line starting
+with a '.' will be prefixed with another '.'.
+C<DATA> may be an array or a reference to an array.
+
+=item dataend ()
+
+End the sending of data to the remote server. This is done by ensuring that
+the data already sent ends with CRLF then sending '.CRLF' to end the
+transmission. Once this data has been sent C<dataend> calls C<response> and
+returns true if C<response> returns CMD_OK.
+
+=back
+
+=head1 CLASS METHODS
+
+These methods are not intended to be called by the user, but used or 
+over-ridden by a sub-class of C<Net::Cmd>
+
+=over 4
+
+=item debug_print ( DIR, TEXT )
+
+Print debugging information. C<DIR> denotes the direction I<true> being
+data being sent to the server. Calls C<debug_text> before printing to
+STDERR.
+
+=item debug_text ( TEXT )
+
+This method is called to print debugging information. TEXT is
+the text being sent. The method should return the text to be printed
+
+This is primarily meant for the use of modules such as FTP where passwords
+are sent, but we do not want to display them in the debugging information.
+
+=item command ( CMD [, ARGS, ... ])
+
+Send a command to the command server. All arguments a first joined with
+a space character and CRLF is appended, this string is then sent to the
+command server.
+
+Returns undef upon failure
+
+=item unsupported ()
+
+Sets the status code to 580 and the response text to 'Unsupported command'.
+Returns zero.
+
+=item response ()
+
+Obtain a response from the server. Upon success the most significant digit
+of the status code is returned. Upon failure, timeout etc., I<undef> is
+returned.
+
+=item parse_response ( TEXT )
+
+This method is called by C<response> as a method with one argument. It should
+return an array of 2 values, the 3-digit status code and a flag which is true
+when this is part of a multi-line response and this line is not the list.
+
+=item getline ()
+
+Retrieve one line, delimited by CRLF, from the remote server. Returns I<undef>
+upon failure.
+
+B<NOTE>: If you do use this method for any reason, please remember to add
+some C<debug_print> calls into your method.
+
+=item ungetline ( TEXT )
+
+Unget a line of text from the server.
+
+=item read_until_dot ()
+
+Read data from the remote server until a line consisting of a single '.'.
+Any lines starting with '..' will have one of the '.'s removed.
+
+Returns a reference to a list containing the lines, or I<undef> upon failure.
+
+=back
+
+=head1 EXPORTS
+
+C<Net::Cmd> exports six subroutines, five of these, C<CMD_INFO>, C<CMD_OK>,
+C<CMD_MORE>, C<CMD_REJECT> and C<CMD_ERROR> ,correspond to possible results
+of C<response> and C<status>. The sixth is C<CMD_PENDING>.
+
+=head1 AUTHOR
+
+Graham Barr <gbarr@ti.com>
+
+=head1 COPYRIGHT
+
+Copyright (c) 1995-1997 Graham Barr. All rights reserved.
+This program is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut

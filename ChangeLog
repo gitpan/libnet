@@ -1,3 +1,50 @@
+Wed Mar 12 1997
+	o Release 1.05
+	o Net::NNTP, Net::SMTP, Net::PH, Net::POP3, Net::SNPP
+	  - Fixed a bug in new so that the for loop uses a different
+	    variable for $host, otherwise $host is undef after the loop
+	o Net::PH
+	  - Fixed a bug in add and delete for when a string is passed
+	    instead of an anonymous hash.
+	o Net::Time
+	  - Added timeout argument
+	o Configure, Net::Time
+	  - Added time_hosts and daytime_hosts to NetConfig
+	o Net::Domain
+	   - Added POSIX uname to methods for obtaining the hostname
+	   - Increased the priority of /etc/resolv.conf when looking for
+	     domain name
+	   - Added the use of syscall for domainname
+	o Net::FTP
+	  - fixed problem with data channel being left open if there
+	    was an error from the command in _data_cmd
+
+	  - Change made to _datacon fir the case where PASV is being
+	    used and the command returns an error immediately.
+
+	  - Modified _store_cmd to call abort if it fails to send a packet
+	    of data.
+	o Added nntp.mirror demo by "Paul E. Hoffman" <phoffman@imc.org>
+	o Applied Net::FTP::_extract_path patch from
+		Roderick Schertler <roderick@gate.net>, Thanks!
+	o Applied Net::SMTP documentation patch from
+		Gisle Aas <gisle@aas.no>, Thanks!
+	o Applied Net::FTP documentation patch from
+		Roderick Schertler <roderick@gate.net>, Thanks!
+	o Fixed Net::NNTP to return undef if initial response from
+	  the server is
+	    502 You have no permission to talk.  Goodbye.
+	o Fixed Net::FTP to work with brain-dead MS FTP servers
+	o Added site wide passive stuff to Configure and Net::FTP
+	o Net::Config is now self-modifying
+	o Fixed a bug in Net::Cmd::datasend for quotting lines that start
+	  with .
+	o Modified Configure script
+	o added skeleton tests ftp.t, smtp.t, nntp.t, ph.t
+	o minor bug fixes to NNTP and FTP
+
+Tue Jan 07 1997
+	o Release 1.04
 	o Changed Configure to prompt for hosts
 	o Added usage of Net::Config into Net::FTP, Net::PH, Net::SMTP,
 	  Net::NNTP, Net::POP3, Net::SNPP
@@ -6,7 +53,7 @@
 	o Added a check for 550 to Net::FTP::mkdir
 	o Added force method to Net::PH
 
-Thu Jan 02 1996
+Thu Jan 02 1997
 	o Release 1.03
 	o Fixed a bug in Net::SNPP::service_level
 	o Added binmode patch to Net::FTP
@@ -29,7 +76,7 @@ Mon Dec 23 1996
 	o Fixed Net::Cmd::datasend to stop addition of extra newlines
 	o Added patch to mdtm from James Jurach <muaddib@ein.cz>
 
-Thu Sep  5 1996 Graham Barr <bodg@tiuk.ti.com>
+Thu Sep  5 1996 Graham Barr <gbarr@ti.com>
 	o Release 1.01
 	o Started to add ESMTP support into Net::SMTP
 	o Added a fix to Net::FTP::login for firewalls that do not
@@ -54,30 +101,30 @@ Thu Sep  5 1996 Graham Barr <bodg@tiuk.ti.com>
 	o Changed CMD_PENDING to be 0 instead of 9, this is due to
 	  Net::SNPP using status codes > 5
 
---- May -- 1996  Graham Barr <bodg@tiuk.ti.com>
+--- May -- 1996  Graham Barr <gbarr@ti.com>
 
         o Major changes to all modules (documentation and functionality)
           although backwards compatability should be maintained.
           This is the kind of comment you get when you forget to update
           ChangeLog when you actually to the changes :-(
 
-Tue May 28 1996  Graham Barr <bodg@tiuk.ti.com>
+Tue May 28 1996  Graham Barr <gbarr@ti.com>
 
 	o Combined Net-SMTP, Net-FTP and Net-Domain distributions into one
 	  libnet distribution
 	o Modified FTP and SMTP to use new IO:: modules
 	o Split Cmd.pm out from Net::FTP and Net::SMTP
 
-Wed Apr 10 1996  Graham Barr <bodg@tiuk.ti.com>
+Wed Apr 10 1996  Graham Barr <gbarr@ti.com>
 
 	o Removed 'Use of uninitialized value' from send
 
-Mon Mar 18 1996  Graham Barr <bodg@tiuk.ti.com>
+Mon Mar 18 1996  Graham Barr <gbarr@ti.com>
 
 	o FTP: Removed parse_dir and file_mode as there is now a File::Listing
 	  package avaliable with libwww which can do directory listings
 
-Sat Mar  9 1996 Graham Barr <bodg@tiuk.ti.com>
+Sat Mar  9 1996 Graham Barr <gbarr@ti.com>
 
 	o SMTP: Significantely updated the documentation
 	o SMTP: modified data() and added datasend() and dataend() so
@@ -89,23 +136,23 @@ Sat Mar  9 1996 Graham Barr <bodg@tiuk.ti.com>
 	o SMTP: recipient will now fail when required
 	o SMTP: added code() method
 
-Tue Mar  5 1996  Graham Barr <bodg@tiuk.ti.com>
+Tue Mar  5 1996  Graham Barr <gbarr@ti.com>
 
 	o Changes to Net::FTP::A::read for files which have very long
 	  lines and do not fit into a single buffer
 	o Changes to responce for knackered FTP servers which send
 	  a Transfer Complete response before they send the data ?? :-(
 
-Wed Jan  3 1996  Graham Barr <bodg@tiuk.ti.com>
+Wed Jan  3 1996  Graham Barr <gbarr@ti.com>
 
 	o Moved netrc stuff into Net::Netrc
 
-Tue Dec 19 1995  Graham Barr <bodg@tiuk.ti.com>
+Tue Dec 19 1995  Graham Barr <gbarr@ti.com>
 
 	o Fixed a problem with Net::FTP::A:read which caused the last line
 	  of a transfer to be dropped if it did not end in a \n
 
-Mon Dec 11 1995  Graham Barr <bodg@tiuk.ti.com>
+Mon Dec 11 1995  Graham Barr <gbarr@ti.com>
 
 	o Introduced IO::Socket which eventually will be released
 	  separetely.
@@ -114,18 +161,18 @@ Mon Dec 11 1995  Graham Barr <bodg@tiuk.ti.com>
 	o Data connection now blessed into a package Net::FTP::type
 	  where type is the connection type (eg A for ASCII)
 
-Tue Nov 21 1995 Graham Barr <bodg@tiuk.ti.com>
+Tue Nov 21 1995 Graham Barr <gbarr@ti.com>
 
 	o Changed to use Socket(v1.3) instead of directly calling pack
 	o SMTP::new now takes optional parameters after the host
 	  in for form of a hash. Current parameters are Hello,Debug,Port
 	o Modified SMTP::new to automatically call hello
 
-Mon Nov 20 1995  Graham Barr <bodg@tiuk.ti.com>
+Mon Nov 20 1995  Graham Barr <gbarr@ti.com>
 
 	o Some perl -w clean ups
 
-Thu Nov  9 1995  Graham Barr <bodg@tiuk.ti.com>
+Thu Nov  9 1995  Graham Barr <gbarr@ti.com>
 
 	o Modified FTP::new() to call croak when IP address cannot be
 	  determined from name given.

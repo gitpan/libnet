@@ -1,154 +1,10 @@
 # Net::POP3.pm
 #
-# Copyright (c) 1995 Graham Barr <Graham.Barr@tiuk.ti.com>. All rights
-# reserved. This program is free software; you can redistribute it and/or
+# Copyright (c) 1995-1997 Graham Barr <gbarr@ti.com>. All rights reserved.
+# This program is free software; you can redistribute it and/or
 # modify it under the same terms as Perl itself.
 
 package Net::POP3;
-
-=head1 NAME
-
-Net::POP3 - Post Office Protocol 3 Client class (RFC1081)
-
-=head1 SYNOPSIS
-
-    use Net::POP3;
-    
-    # Constructors
-    $pop = Net::POP3->new('pop3host');
-    $pop = Net::POP3->new('pop3host', Timeout => 60);
-
-=head1 DESCRIPTION
-
-This module implements a client interface to the POP3 protocol, enabling
-a perl5 application to talk to POP3 servers. This documentation assumes
-that you are familiar with the POP3 protocol described in RFC1081.
-
-A new Net::POP3 object must be created with the I<new> method. Once
-this has been done, all POP3 commands are accessed via method calls
-on the object.
-
-=head1 EXAMPLES
-
-    Need some small examples in here :-)
-
-=head1 CONSTRUCTOR
-
-=over 4
-
-=item new ( [ HOST, ] [ OPTIONS ] )
-
-This is the constructor for a new Net::POP3 object. C<HOST> is the
-name of the remote host to which a POP3 connection is required.
-
-If C<HOST> is not given, then the C<POP3_Host> specified in C<Net::Config>
-will be used.
-
-C<OPTIONS> are passed in a hash like fasion, using key and value pairs.
-Possible options are:
-
-B<Timeout> - Maximum time, in seconds, to wait for a response from the
-POP3 server (default: 120)
-
-B<Debug> - Enable debugging information
-
-=back
-
-=head1 METHODS
-
-Unless otherwise stated all methods return either a I<true> or I<false>
-value, with I<true> meaning that the operation was a success. When a method
-states that it returns a value, falure will be returned as I<undef> or an
-empty list.
-
-=over 4
-
-=item user ( USER )
-
-Send the USER command.
-
-=item pass ( PASS )
-
-Send the PASS command. Returns the number of messages in the mailbox.
-
-=item login ( [ USER [, PASS ]] )
-
-Send both the the USER and PASS commands. If C<PASS> is not given the
-C<Net::POP3> uses C<Net::Netrc> to lookup the password using the host
-and username. If the username is not specified then the current user name
-will be used.
-
-Returns the number of messages in the mailbox.
-
-=item top ( MSGNUM [, NUMLINES ] )
-
-Get the header and the first C<NUMLINES> of the body for the message
-C<MSGNUM>. Returns a reference to an array which contains the lines of text
-read from the server.
-
-=item list ( [ MSGNUM ] )
-
-If called with an argument the C<list> returns the size of the messsage
-in octets.
-
-If called without arguments the a refererence to a hash is returned. The
-keys will be the C<MSGNUM>'s of all undeleted messages and the values will
-be their size in octets.
-
-=item get ( MSGNUM )
-
-Get the message C<MSGNUM> from the remote mailbox. Returns a reference to an
-array which contains the lines of text read from the server.
-
-=item last ()
-
-Returns the highest C<MSGNUM> of all the messages accessed.
-
-=item popstat ()
-
-Returns an array of two elements. These are the number of undeleted
-elements and the size of the mbox in octets.
-
-=item delete ( MSGNUM )
-
-Mark message C<MSGNUM> to be deleted from the remote mailbox. All messages
-that are marked to be deleted will be removed from the remote mailbox
-when the server connection closed.
-
-=item reset ()
-
-Reset the status of the remote POP3 server. This includes reseting the
-status of all messages to not be deleted.
-
-=item quit ()
-
-Quit and close the connection to the remote POP3 server. Any messages marked
-as deleted will be deleted from the remote mailbox.
-
-=back
-
-=head1 NOTES
-
-If a C<Net::POP3> object goes out of scope before C<quit> method is called
-then the C<reset> method will called before the connection is closed. This
-means that any messages marked to be deleted will not be.
-
-=head1 SEE ALSO
-
-L<Net::Netrc>
-L<Net::Cmd>
-
-=head1 AUTHOR
-
-Graham Barr <Graham.Barr@tiuk.ti.com>
-
-=head1 COPYRIGHT
-
-Copyright (c) 1995 Graham Barr. All rights reserved. This program is free
-software; you can redistribute it and/or modify it under the same terms
-as Perl itself.
-
-=cut
 
 use strict;
 use IO::Socket;
@@ -157,7 +13,7 @@ use Net::Cmd;
 use Carp;
 use Net::Config;
 
-$VERSION = "2.04";
+$VERSION = do { my @r=(q$Revision: 2.9 $=~/\d+/g); sprintf "%d."."%02d"x$#r,@r};
 
 @ISA = qw(Net::Cmd IO::Socket::INET);
 
@@ -167,12 +23,13 @@ sub new
  my $type = ref($self) || $self;
  my $host = shift if @_ % 2;
  my %arg  = @_; 
- my $hosts = defined $host ? [ $host ] : $NetConfig{POP3_Hosts};
+ my $hosts = defined $host ? [ $host ] : $NetConfig{pop3_hosts};
  my $obj;
 
- foreach $host (@{$hosts})
+ my $h;
+ foreach $h (@{$hosts})
   {
-   $obj = $type->SUPER::new(PeerAddr => $host, 
+   $obj = $type->SUPER::new(PeerAddr => ($host = $h), 
 			    PeerPort => $arg{Port} || 'pop3(110)',
 			    Proto    => 'tcp',
 			    Timeout  => defined $arg{Timeout}
@@ -402,3 +259,149 @@ sub response
 }
 
 1;
+
+__END__
+
+=head1 NAME
+
+Net::POP3 - Post Office Protocol 3 Client class (RFC1081)
+
+=head1 SYNOPSIS
+
+    use Net::POP3;
+    
+    # Constructors
+    $pop = Net::POP3->new('pop3host');
+    $pop = Net::POP3->new('pop3host', Timeout => 60);
+
+=head1 DESCRIPTION
+
+This module implements a client interface to the POP3 protocol, enabling
+a perl5 application to talk to POP3 servers. This documentation assumes
+that you are familiar with the POP3 protocol described in RFC1081.
+
+A new Net::POP3 object must be created with the I<new> method. Once
+this has been done, all POP3 commands are accessed via method calls
+on the object.
+
+=head1 EXAMPLES
+
+    Need some small examples in here :-)
+
+=head1 CONSTRUCTOR
+
+=over 4
+
+=item new ( [ HOST, ] [ OPTIONS ] )
+
+This is the constructor for a new Net::POP3 object. C<HOST> is the
+name of the remote host to which a POP3 connection is required.
+
+If C<HOST> is not given, then the C<POP3_Host> specified in C<Net::Config>
+will be used.
+
+C<OPTIONS> are passed in a hash like fashion, using key and value pairs.
+Possible options are:
+
+B<Timeout> - Maximum time, in seconds, to wait for a response from the
+POP3 server (default: 120)
+
+B<Debug> - Enable debugging information
+
+=back
+
+=head1 METHODS
+
+Unless otherwise stated all methods return either a I<true> or I<false>
+value, with I<true> meaning that the operation was a success. When a method
+states that it returns a value, failure will be returned as I<undef> or an
+empty list.
+
+=over 4
+
+=item user ( USER )
+
+Send the USER command.
+
+=item pass ( PASS )
+
+Send the PASS command. Returns the number of messages in the mailbox.
+
+=item login ( [ USER [, PASS ]] )
+
+Send both the the USER and PASS commands. If C<PASS> is not given the
+C<Net::POP3> uses C<Net::Netrc> to lookup the password using the host
+and username. If the username is not specified then the current user name
+will be used.
+
+Returns the number of messages in the mailbox.
+
+=item top ( MSGNUM [, NUMLINES ] )
+
+Get the header and the first C<NUMLINES> of the body for the message
+C<MSGNUM>. Returns a reference to an array which contains the lines of text
+read from the server.
+
+=item list ( [ MSGNUM ] )
+
+If called with an argument the C<list> returns the size of the message
+in octets.
+
+If called without arguments a reference to a hash is returned. The
+keys will be the C<MSGNUM>'s of all undeleted messages and the values will
+be their size in octets.
+
+=item get ( MSGNUM )
+
+Get the message C<MSGNUM> from the remote mailbox. Returns a reference to an
+array which contains the lines of text read from the server.
+
+=item last ()
+
+Returns the highest C<MSGNUM> of all the messages accessed.
+
+=item popstat ()
+
+Returns an array of two elements. These are the number of undeleted
+elements and the size of the mbox in octets.
+
+=item delete ( MSGNUM )
+
+Mark message C<MSGNUM> to be deleted from the remote mailbox. All messages
+that are marked to be deleted will be removed from the remote mailbox
+when the server connection closed.
+
+=item reset ()
+
+Reset the status of the remote POP3 server. This includes reseting the
+status of all messages to not be deleted.
+
+=item quit ()
+
+Quit and close the connection to the remote POP3 server. Any messages marked
+as deleted will be deleted from the remote mailbox.
+
+=back
+
+=head1 NOTES
+
+If a C<Net::POP3> object goes out of scope before C<quit> method is called
+then the C<reset> method will called before the connection is closed. This
+means that any messages marked to be deleted will not be.
+
+=head1 SEE ALSO
+
+L<Net::Netrc>
+L<Net::Cmd>
+
+=head1 AUTHOR
+
+Graham Barr <gbarr@ti.com>
+
+=head1 COPYRIGHT
+
+Copyright (c) 1995-1997 Graham Barr. All rights reserved.
+This program is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut
