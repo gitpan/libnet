@@ -3,7 +3,7 @@ Configure
 Hostname.pm.eg			Example replacement for Hostname.pm
 MANIFEST
 Makefile.PL
-Net/Cmd.pm			(v2.09) 
+Net/Cmd.pm			(v2.10) 
 Net/Domain.pm			(v2.0502) DNS Domain name lookup
 Net/DummyInetd.pm		(v1.06) 
 Net/FTP.pm			(v2.27) File Transfer Protocol Client
@@ -12,9 +12,9 @@ Net/FTP/E.pm
 Net/FTP/I.pm
 Net/FTP/L.pm
 Net/FTP/dataconn.pm
-Net/NNTP.pm			(v2.16) Network News Transfer Protocol
+Net/NNTP.pm			(v2.17) Network News Transfer Protocol
 Net/Netrc.pm			(v2.06) .netrc lookup routines
-Net/PH.pm			(v2.19) CCSO Nameserver Client class
+Net/PH.pm			(v2.20) CCSO Nameserver Client class
 Net/POP3.pm			(v2.11) Post Office Protocol
 Net/SMTP.pm			(v2.10) Simple Mail Transfer Protocol Client
 Net/SNPP.pm			(v1.10) Simple Network Pager Protocol Client
