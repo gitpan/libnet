@@ -10,7 +10,7 @@ use Carp;
 require Net::FTP::dataconn;
 
 @ISA = qw(Net::FTP::dataconn);
-$VERSION = "1.10"; # $Id: //depot/libnet/Net/FTP/A.pm#9 $
+$VERSION = "1.11"; # $Id: //depot/libnet/Net/FTP/A.pm#9 $
 
 sub read {
   my    $data 	 = shift;
@@ -62,7 +62,7 @@ sub read {
   $buf = substr(${*$data},0,$size);
   substr(${*$data},0,$size) = '';
 
-  $size;
+  length $buf;
 }
 
 sub write {
