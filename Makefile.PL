@@ -12,21 +12,6 @@ BEGIN { require 5.002 }
 use ExtUtils::MakeMaker;
 use ExtUtils::Manifest qw(maniread);
 
-#--- MY package
-
-sub MY::libscan
-{
- my($self,$path) = @_;
-
- return '' 
-	if($path =~ m:/(RCS|CVS|SCCS)/: ||
-	   $path =~ m:[~%]$: ||
-	   $path =~ m:\.(orig|rej|nfs)$:
-	  );
- 
- $path;
-}
-
 #--- Installation check
 
 sub chk_version
@@ -51,19 +36,19 @@ sub MY::post_initialize
 {
  my ($self) = @_;
 
-#--- Create Net::Config
+ #--- Create Net::Config
 
-my $config_pm = "Net/libnet.cfg";
-my $libnet_cfg = "libnet.cfg";
+ my $config_pm = "Net/libnet.cfg";
+ my $libnet_cfg = "libnet.cfg";
 
-# Use %INC and ExtUtils::MakeMaker to determine how this machine
-# maps package names to path names
+ # Use %INC and ExtUtils::MakeMaker to determine how this machine
+ # maps package names to path names
 
-foreach (keys %INC) {
- last if ($config_pm = $_) =~ s/^ExtUtils(.)MakeMaker.pm/Net${1}libnet.cfg/;
-}
+ foreach (keys %INC) {
+  last if ($config_pm = $_) =~ s/^ExtUtils(.)MakeMaker.pm/Net${1}libnet.cfg/;
+ }
 
-system(($^O eq 'VMS' ? 'mcr ': ()),$^X, 'Configure')
+ system(($^O eq 'VMS' ? 'mcr ': ()),$^X, 'Configure')
 	unless -f $libnet_cfg;
 
  $self->{PM}->{$libnet_cfg} = $self->catfile('$(INST_LIBDIR)',$config_pm);
@@ -83,17 +68,35 @@ chk_version(IO::Socket => '1.05') or
 	. "*** For Net::Cmd to work you require version 1.05, or later, of\n"
 	. "    IO/Socket.pm from CPAN/modules/by-module/IO/IO-x.x.tar.gz\n\n";
 
+if ($^O eq 'os390')
+{
+  chk_version(Convert::EBCDIC => '0.06') or
+   warn  "\n"
+   . "*** For Net::Cmd to work on $^O version 0.06, or later, of\n"
+   . "    Convert::EBCDIC is required, which can be found at"
+   . "    CPAN/modules/by-module/Convert/Convert-EBCDIC-x.x.tar.gz\n\n";
+}
+
 #--- Write the Makefile
 
+my @ppd;
+
+if ($] >= 5.00503) {
+  @ppd = (
+    AUTHOR    => 'Graham Barr <gbarr@pobox.com>',
+    ABSTRACT  => 'Collection of Network protocol modules',
+  );
+}
+
 WriteMakefile(
-	VERSION   => $VERSION,
-	DISTNAME  => $DISTNAME,
-	NAME      => $NAME,
-	AUTHOR    => 'Graham Barr <gbarr@pobox.com>',
-	ABSTRACT  => 'Collection of Network protocol modules',
-	'realclean'   => {FILES => $config_pm},
-	PREREQ_PM => {
-			Socket => 1.3,
-			IO::Socket => 1.05
-		    },
+  VERSION     => $VERSION,
+  DISTNAME    => $DISTNAME,
+  NAME        => $NAME,
+  'realclean' => {FILES => $config_pm},
+  PREREQ_PM   => {
+		Socket     => 1.3,
+		IO::Socket => 1.05
+	      },
+  @ppd,
 );
+
