@@ -1,3 +1,16 @@
+Thu Apr 03 1997
+        Net::Domain
+        - Fixed 'Use of uninitialized value' in _hostdomain()
+
+        Configure
+        - Remove the use of Net::Domain, as this required Net::Config
+          to be installed before it was created.
+        - Removed the need for Data::Dumper to be installed for
+          Configure to be run.
+ 
+        Makefile.PL
+        - Changed the die to warn if Data::Dumper is not installed
+
 Wed Mar 19 1997
 	Net::SMTP
         - Changed the default HELO argument from hostdomain() to hostfqdn()

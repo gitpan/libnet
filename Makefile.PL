@@ -5,7 +5,7 @@
 
 $NAME     = 'Net';
 $DISTNAME = "libnet";
-$VERSION  = "1.05_01";
+$VERSION  = "1.0502";
 
 BEGIN { require 5.002 }
 
@@ -60,7 +60,7 @@ chk_version(IO::Socket => '1.05') or
 	. "    IO/Socket.pm from CPAN/modules/by-module/IO/IO-x.x.tar.gz\n\n";
 
 chk_version(Data::Dumper => '0.01') or
-    die  "\n"
+    warn  "\n"
 	. "*** To be able to use the libnet modules you *MUST* have\n"
 	. "    Data::Dumper installed. You can obtain this from\n"
 	. "    CPAN/modules/by-module/Data/Data-Dumper-x.x.tar.gz\n\n";
@@ -99,4 +99,9 @@ WriteMakefile(
  
 	'clean'   => {FILES => join(" ", @clean,  )},
 	'realclean'   => {FILES => $config_pm},
+	PREREQ_PM => {
+			Data::Dumper => 0,
+			Socket => 1.3,
+			IO::Socket => 1.05
+		    },
 );

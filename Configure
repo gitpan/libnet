@@ -15,6 +15,7 @@ use vars qw($opt_d $opt_o);
 ##
 
 my %cfg = ();
+my @cfg = ();
 
 my($config_pm,$msg,$ans,$def,$have_old);
 
@@ -193,17 +194,19 @@ $have_old = -f $config_pm
 	? require $config_pm
 	: eval { require Net::Config };
 
-%cfg = %Net::Config::NetConfig
+my %oldcfg = ();
+
+%oldcfg = %Net::Config::NetConfig
 	if $have_old;
 
 map { $cfg{lc $_} = $cfg{$_}; delete $cfg{$_} if /[A-Z]/ } keys %cfg;
 
-$cfg{'test_exist'} = 1 unless exists $cfg{'test_exist'};
-$cfg{'test_hosts'} = 1 unless exists $cfg{'test_hosts'};
+$oldcfg{'test_exist'} = 1 unless exists $oldcfg{'test_exist'};
+$oldcfg{'test_hosts'} = 1 unless exists $oldcfg{'test_hosts'};
 
 #---------------------------------------------------------------------------
 
-if(not(-f $config_pm) && $have_old && not($opt_d))
+if(!-f $config_pm && $have_old && !$opt_d)
  {
   $msg = <<EDQ;
 
@@ -231,7 +234,7 @@ it will require you to be on-line.
 Do you want me to perform hostname lookups (y|n) ?
 EDQ
 
-$cfg{'test_exist'} = get_bool($msg, $cfg{'test_exist'});
+$cfg{'test_exist'} = get_bool($msg, $oldcfg{'test_exist'});
 
 print <<EDQ unless $cfg{'test_exist'};
 
@@ -257,7 +260,7 @@ EDQ
 
 $msg = 'Enter a list of avaliable NNTP hosts :';
 
-$def = $cfg{'nntp_hosts'} ||
+$def = $oldcfg{'nntp_hosts'} ||
 	[ default_hostname($ENV{NNTPSERVER},$ENV{NEWSHOST},'news') ];
 
 $cfg{'nntp_hosts'} = get_host_list($msg,$def);
@@ -266,7 +269,7 @@ $cfg{'nntp_hosts'} = get_host_list($msg,$def);
 
 $msg = 'Enter a list of avaliable SMTP hosts :';
 
-$def = $cfg{'smtp_hosts'} ||
+$def = $oldcfg{'smtp_hosts'} ||
 	[ default_hostname(split(/:/,$ENV{SMTPHOSTS} || ""), 'mailhost') ];
 
 $cfg{'smtp_hosts'} = get_host_list($msg,$def);
@@ -275,7 +278,7 @@ $cfg{'smtp_hosts'} = get_host_list($msg,$def);
 
 $msg = 'Enter a list of avaliable POP3 hosts :';
 
-$def = $cfg{'pop3_hosts'} || [];
+$def = $oldcfg{'pop3_hosts'} || [];
 
 $cfg{'pop3_hosts'} = get_host_list($msg,$def);
 
@@ -283,7 +286,7 @@ $cfg{'pop3_hosts'} = get_host_list($msg,$def);
 
 $msg = 'Enter a list of avaliable SNPP hosts :';
 
-$def = $cfg{'snpp_hosts'} || [];
+$def = $oldcfg{'snpp_hosts'} || [];
 
 $cfg{'snpp_hosts'} = get_host_list($msg,$def);
 
@@ -291,7 +294,7 @@ $cfg{'snpp_hosts'} = get_host_list($msg,$def);
 
 $msg = 'Enter a list of avaliable PH Hosts   :'  ;
 
-$def = $cfg{'ph_hosts'} ||
+$def = $oldcfg{'ph_hosts'} ||
 	[ default_hostname('dirserv') ];
 
 $cfg{'ph_hosts'}   =  get_host_list($msg,$def);
@@ -300,7 +303,7 @@ $cfg{'ph_hosts'}   =  get_host_list($msg,$def);
 
 $msg = 'Enter a list of avaliable TIME Hosts   :'  ;
 
-$def = $cfg{'time_hosts'} || [];
+$def = $oldcfg{'time_hosts'} || [];
 
 $cfg{'time_hosts'} = get_host_list($msg,$def);
 
@@ -308,7 +311,7 @@ $cfg{'time_hosts'} = get_host_list($msg,$def);
 
 $msg = 'Enter a list of avaliable DAYTIME Hosts   :'  ;
 
-$def = $cfg{'daytime_hosts'} || $cfg{'time_hosts'};
+$def = $oldcfg{'daytime_hosts'} || $oldcfg{'time_hosts'};
 
 $cfg{'daytime_hosts'} = get_host_list($msg,$def);
 
@@ -326,9 +329,9 @@ the name of that gateway here.
 FTP proxy hostname :
 EDQ
 
-$cfg{'ftp_firewall'} ||= $ENV{FTP_FIREWALL};
+$def = $oldcfg{'ftp_firewall'} || $ENV{FTP_FIREWALL};
 
-$cfg{'ftp_firewall'} = get_hostname($msg,$cfg{'ftp_firewall'});
+$cfg{'ftp_firewall'} = get_hostname($msg,$def);
 
 #---------------------------------------------------------------------------
 
@@ -361,32 +364,23 @@ EDQ
 
 $msg = "\nShould all FTP connections via a firewall/proxy be passive (y|n) ?";
 
-$cfg{'ftp_ext_passive'} ||= 0;
+$def = $oldcfg{'ftp_ext_passive'} || 0;
 
-$cfg{'ftp_ext_passive'} = get_bool($msg,$cfg{'ftp_ext_passive'});
+$cfg{'ftp_ext_passive'} = get_bool($msg,$def);
 
 
-$cfg{'ftp_int_passive'} ||= 0;
+$def = $oldcfg{'ftp_int_passive'} || 0;
 
 $msg = "\nShould all other FTP connections be passive (y|n) ?";
 
-$cfg{'ftp_int_passive'} = get_bool($msg,$cfg{'ftp_int_passive'});
+$cfg{'ftp_int_passive'} = get_bool($msg,$def);
 
 
 #---------------------------------------------------------------------------
 
-$cfg{'inet_domain'} ||= $ENV{LOCALDOMAIN};
+$def = $oldcfg{'inet_domain'} || $ENV{LOCALDOMAIN};
 
-if(!defined($cfg{'inet_domain'})
-	&& $cfg{'test_exist'}		# Net::Domain does hostname lookups
-	&& -f "Net/Domain.pm")
- {
-  require "Net/Domain.pm";
-  $cfg{'inet_domain'} = Net::Domain::hostdomain();
- }
-
-$ans = Prompt("\nWhat is your local internet domain name :",
-		$cfg{'inet_domain'});
+$ans = Prompt("\nWhat is your local internet domain name :",$def);
 
 $cfg{'inet_domain'} = ($ans =~ /(\S+)/)[0];
 
@@ -404,7 +398,7 @@ unless the hosts are local.
 Do you want me to run these tests (y|n) ?
 EDQ
 
-$cfg{'test_hosts'} = get_bool($msg,$cfg{'test_hosts'});
+$cfg{'test_hosts'} = get_bool($msg,$oldcfg{'test_hosts'});
 
 #---------------------------------------------------------------------------
 
@@ -416,7 +410,7 @@ should allow anonymous access and have a /pub directory
 What host can I use :
 EDQ
 
-$cfg{'ftp_testhost'} = get_hostname($msg,$cfg{'ftp_testhost'})
+$cfg{'ftp_testhost'} = get_hostname($msg,$oldcfg{'ftp_testhost'})
 	if $cfg{'test_hosts'};
 
 
@@ -424,15 +418,55 @@ print "\n";
 
 #---------------------------------------------------------------------------
 
+my @old = ();
+
+if($have_old && exists $INC{$config_pm}) {
+    my $fh = IO::File->new($INC{$config_pm}, "r");
+    @old = $fh->getlines;
+    while(@old) {
+	last if(shift(@old) =~ /^%NetConfig/);
+    }
+    while(@old) {
+	last if(pop(@old) =~ /^\s*\);/);
+    }
+    $old[-1] =~ s/,?\s*\n/,\n/ if @old;
+    $fh->close;
+}
+
 my $fh = IO::File->new($config_pm, "w") or
 	die "Cannot create `$config_pm': $!";
 
 print "Writing $config_pm\n";
 
 $fh->print(<DATA>,
-	   Data::Dumper->Dump([\%cfg],['*NetConfig']),
-	   "\n1;\n"
-	  );
+	   "\%NetConfig = (\n",
+	    @old);
+
+my $key;
+foreach $key (keys %cfg) {
+    my $val = $cfg{$key};
+    if(!defined($val)) {
+	$val = "undef";
+    }
+    elsif(ref($val)) {
+	$val = '[' . join(",",
+	    map {
+		my $v = "undef";
+		if(defined $_) {
+		    ($v = $_) =~ s/'/\'/sog;
+		    $v = "'" . $v . "'";
+		}
+		$v;
+	    } @$val ) . ']';
+    }
+    else {
+	$val =~ s/'/\'/sog;
+	$val = "'" . $val . "'";
+    }
+    $fh->print("\t",$key," => ",$val,",\n");
+}
+
+$fh->print("\n);\n1;\n");
 
 $fh->close;
 
@@ -511,5 +545,3 @@ sub set
 # WARNING  WARNING  WARNING  WARNING  WARNING  WARNING  WARNING
 #
 # Below this line is auto-generated, *ANY* changes will be lost
-
-
