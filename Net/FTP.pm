@@ -1257,6 +1257,9 @@ Get C<REMOTE_FILE> from the server and store locally. C<LOCAL_FILE> may be
 a filename or a filehandle. If not specified the the file will be stored in
 the current directory with the same leafname as the remote file.
 
+If C<WHERE> is specified, continue transfer of the remote file
+from this point.
+
 Returns C<LOCAL_FILE>, or the generated local file name if C<LOCAL_FILE>
 is not given.
 

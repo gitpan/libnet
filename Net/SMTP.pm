@@ -16,7 +16,7 @@ use IO::Socket;
 use Net::Cmd;
 use Net::Config;
 
-$VERSION = do { my @r=(q$Revision: 2.9 $=~/\d+/g); sprintf "%d."."%02d"x$#r,@r};
+$VERSION = do { my @r=(q$Revision: 2.9.1 $=~/\d+/g); sprintf "%d."."%02d"x$#r,@r};
 
 @ISA = qw(Net::Cmd IO::Socket::INET);
 
@@ -80,7 +80,7 @@ sub hello
  my $domain = shift ||
 	      eval {
 		    require Net::Domain;
-		    Net::Domain::hostdomain();
+		    Net::Domain::hostfqdn();
 		   } ||
 		"";
  my $ok = $me->_EHLO($domain);

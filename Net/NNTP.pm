@@ -14,7 +14,7 @@ use Carp;
 use Time::Local;
 use Net::Config;
 
-$VERSION = do { my @r=(q$Revision: 2.14 $=~/\d+/g); sprintf "%d."."%02d"x$#r,@r};
+$VERSION = do { my @r=(q$Revision: 2.14.1 $=~/\d+/g); sprintf "%d."."%02d"x$#r,@r};
 @ISA     = qw(Net::Cmd IO::Socket::INET);
 
 sub new
@@ -231,7 +231,8 @@ sub newgroups
 
 sub newnews
 {
- @_ >= 3 or croak 'usage: $nntp->newnews( SINCE [, GROUPS [, DISTRIBUTIONS ]])';
+ @_ >= 2 && @_ <= 4 or
+	croak 'usage: $nntp->newnews( SINCE [, GROUPS [, DISTRIBUTIONS ]])';
  my $nntp = shift;
  my $time = _timestr(shift);
  my $grp  = @_ ? shift : $nntp->group;

@@ -13,7 +13,7 @@ use strict;
 use vars qw(@ISA @EXPORT $VERSION);
 use Carp;
 
-$VERSION = "2.08";
+$VERSION = "2.0801";
 @ISA     = qw(Exporter);
 @EXPORT  = qw(CMD_INFO CMD_OK CMD_MORE CMD_REJECT CMD_ERROR CMD_PENDING);
 
@@ -219,7 +219,8 @@ sub getline
     {
      unless (sysread($cmd, $buf="", 1024))
       {
-       carp ref($cmd) . ": Unexpected EOF on command channel";
+       carp ref($cmd) . ": Unexpected EOF on command channel"
+		if $cmd->debug;
        $cmd->close;
        return undef;
       } 

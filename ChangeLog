@@ -1,3 +1,22 @@
+Wed Mar 19 1997
+	Net::SMTP
+        - Changed the default HELO argument from hostdomain() to hostfqdn()
+ 
+        Net::Cmd, Net::Domain
+        - Incremented VERSION numbers
+ 
+        Net::NNTP
+        - corrected @_ check for newnews
+ 
+        Net::Domain
+        - Added use of inet_domain element from NetConfig
+ 
+        Net::FTP
+        - Updated documentation for get for WHERE
+
+	Net::Cmd 
+        - Added ->debug as conditional to EOF warning
+
 Wed Mar 12 1997
 	o Release 1.05
 	o Net::NNTP, Net::SMTP, Net::PH, Net::POP3, Net::SNPP

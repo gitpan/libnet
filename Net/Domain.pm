@@ -11,11 +11,12 @@ require Exporter;
 use Carp;
 use strict;
 use vars qw($VERSION @ISA @EXPORT_OK);
+use Net::Config;
 
 @ISA = qw(Exporter);
 @EXPORT_OK = qw(hostname hostdomain hostfqdn domainname);
 
-$VERSION = do { my @r=(q$Revision: 2.5 $=~/\d+/g); sprintf "%d."."%02d"x$#r,@r};
+$VERSION = do { my @r=(q$Revision: 2.5.1 $=~/\d+/g); sprintf "%d."."%02d"x$#r,@r};
 
 my($host,$domain,$fqdn) = (undef,undef,undef);
 
@@ -81,6 +82,9 @@ sub _hostdomain {
     # we already know it
     return $domain
     	if(defined $domain);
+
+    return $domain = $NetConfig{'inet_domain'}
+	if exists $NetConfig{'inet_domain'};
 
     # try looking in /etc/resolv.conf
     # putting this here and assuming that it is correct, eliminates
