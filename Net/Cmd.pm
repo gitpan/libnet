@@ -13,7 +13,7 @@ use strict;
 use vars qw(@ISA @EXPORT $VERSION);
 use Carp;
 
-$VERSION = "2.12";
+$VERSION = "2.16";
 @ISA     = qw(Exporter);
 @EXPORT  = qw(CMD_INFO CMD_OK CMD_MORE CMD_REJECT CMD_ERROR CMD_PENDING);
 
@@ -53,7 +53,7 @@ sub _print_isa
    my $spc = $spc{$pkg};
    print STDERR "$cmd: ${spc}${pkg}${v}\n";
 
-   if(defined @{"${pkg}::ISA"})
+   if(@{"${pkg}::ISA"})
     {
      @spc{@{"${pkg}::ISA"}} = ("  " . $spc{$pkg}) x @{"${pkg}::ISA"};
      unshift(@do, @{"${pkg}::ISA"});
@@ -159,6 +159,8 @@ sub command
 {
  my $cmd = shift;
 
+ return $cmd unless defined fileno($cmd);
+ 
  $cmd->dataend()
     if(exists ${*$cmd}{'net_cmd_lastch'});
 
@@ -166,7 +168,7 @@ sub command
   {
    local $SIG{PIPE} = 'IGNORE';
 
-   my $str =  join(" ",@_) . "\015\012";
+   my $str =  join(" ", map { /\n/ ? do { my $n = $_; $n =~ tr/\n/ /; $n } : $_; } @_) . "\015\012";
    my $len = length $str;
    my $swlen;
    
@@ -209,7 +211,8 @@ sub getline
  return shift @{${*$cmd}{'net_cmd_lines'}}
     if scalar(@{${*$cmd}{'net_cmd_lines'}});
 
- my $partial = ${*$cmd}{'net_cmd_partial'} || "";
+ my $partial = defined(${*$cmd}{'net_cmd_partial'})
+		? ${*$cmd}{'net_cmd_partial'} : "";
  my $fd = fileno($cmd);
  
  return undef
@@ -228,7 +231,7 @@ sub getline
     {
      unless (sysread($cmd, $buf="", 1024))
       {
-       carp ref($cmd) . ": Unexpected EOF on command channel"
+       carp(ref($cmd) . ": Unexpected EOF on command channel")
 		if $cmd->debug;
        $cmd->close;
        return undef;
@@ -249,7 +252,7 @@ sub getline
     }
    else
     {
-     carp "$cmd: Timeout" if($cmd->debug);
+     carp("$cmd: Timeout") if($cmd->debug);
      return undef;
     }
   }
@@ -336,6 +339,8 @@ sub datasend
  my $arr = @_ == 1 && ref($_[0]) ? $_[0] : \@_;
  my $line = join("" ,@$arr);
 
+ return 0 unless defined(fileno($cmd));
+
  return 1
     unless length($line);
 
@@ -355,14 +360,40 @@ sub datasend
  ${*$cmd}{'net_cmd_lastch'} = substr($line,-1,1);
 
  my $len = length($line) - 1;
+ my $offset = 1;
+ my $win = "";
+ vec($win,fileno($cmd),1) = 1;
+ my $timeout = $cmd->timeout || undef;
 
- return $len == 0 ||
-	syswrite($cmd, $line, $len, 1) == $len;
+ while($len)
+  {
+   my $wout;
+   if (select(undef,$wout=$win, undef, $timeout) > 0)
+    {
+     my $w = syswrite($cmd, $line, $len, $offset);
+     unless (defined($w))
+      {
+       carp("$cmd: $!") if $cmd->debug;
+       return undef;
+      }
+     $len -= $w;
+     $offset += $w;
+    }
+   else
+    {
+     carp("$cmd: Timeout") if($cmd->debug);
+     return undef;
+    }
+  }
+
+ 1;
 }
 
 sub dataend
 {
  my $cmd = shift;
+
+ return 0 unless defined(fileno($cmd));
 
  return 1
     unless(exists ${*$cmd}{'net_cmd_lastch'});

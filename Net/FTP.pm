@@ -21,7 +21,7 @@ use Net::Cmd;
 use Net::Config;
 # use AutoLoader qw(AUTOLOAD);
 
-$VERSION = "2.40"; # $Id: //depot/libnet/Net/FTP.pm#25$
+$VERSION = "2.53"; # $Id$
 @ISA     = qw(Exporter Net::Cmd IO::Socket::INET);
 
 # Someday I will "use constant", when I am not bothered to much about
@@ -87,6 +87,8 @@ sub new
 		    ? $NetConfig{ftp_ext_passive}
 		    : $NetConfig{ftp_int_passive};	# Whew! :-)
 
+ $ftp->hash(exists $arg{Hash} ? $arg{Hash} : 0, 1024);
+
  $ftp->autoflush(1);
 
  $ftp->debug(exists $arg{Debug} ? $arg{Debug} : undef);
@@ -104,6 +106,32 @@ sub new
 ##
 ## User interface methods
 ##
+
+sub hash {
+    my $ftp = shift;		# self
+    my $prev = ${*$ftp}{'net_ftp_hash'} || [\*STDERR, 0];
+
+    unless(@_) {
+      return $prev;
+    }
+    my($h,$b) = @_;
+    if(@_ == 1) {
+      unless($h) {
+        delete ${*$ftp}{'net_ftp_hash'};
+        return $prev;
+      }
+      elsif(ref($h)) {
+        $b = 1024;
+      }
+      else {
+        ($h,$b) = (\*STDERR,$h);
+      }
+    }
+    select((select($h), $|=1)[0]);
+    $b = 512 if $b < 512;
+    ${*$ftp}{'net_ftp_hash'} = [$h, $b];
+    $prev;
+}        
 
 sub quit
 {
@@ -163,32 +191,31 @@ sub mdtm
     : undef;
 }
 
-sub size
-{
- my $ftp  = shift;
- my $file = shift;
- my $io;
- if($ftp->supported("SIZE")) {
-	return $ftp->_SIZE($file)
-	    ? ($ftp->message =~ /(\d+)/)[0]
-	    : undef;
+sub size {
+  my $ftp  = shift;
+  my $file = shift;
+  my $io;
+  if($ftp->supported("SIZE")) {
+    return $ftp->_SIZE($file)
+	? ($ftp->message =~ /(\d+)/)[0]
+	: undef;
  }
  elsif($ftp->supported("STAT")) {
-	my @msg;
-	return undef
-	    unless $ftp->_STAT($file) && (@msg = $ftp->message) == 3;
-	my $line;
-	foreach $line (@msg) {
-	    return (split(/\s+/,$line))[4]
-		if $line =~ /^[-rw]{10}/
-	}
+   my @msg;
+   return undef
+       unless $ftp->_STAT($file) && (@msg = $ftp->message) == 3;
+   my $line;
+   foreach $line (@msg) {
+     return (split(/\s+/,$line))[4]
+	 if $line =~ /^[-rw]{10}/
+   }
  }
- elsif($io = $ftp->list($file)) {
-	my $line;
-	$io->read($line,1024);
-	$io->close;
-	return (split(/\s+/,$1))[4]
-	    if $line =~ /^([-rw]{10}.*)\n/s;
+ else {
+   my @files = $ftp->dir($file);
+   if(@files) {
+     return (split(/\s+/,$1))[4]
+	 if $files[0] =~ /^([-rw]{10}.*)$/;
+   }
  }
  undef;
 }
@@ -213,7 +240,7 @@ sub login
 
  if(defined ${*$ftp}{'net_ftp_firewall'})
   {
-   $user .= "@" . ${*$ftp}{'net_ftp_host'};
+   $user .= '@' . ${*$ftp}{'net_ftp_host'};
   }
 
  $ok = $ftp->_USER($user);
@@ -240,11 +267,13 @@ sub login
    $ok = $ftp->_PASS($pass || "");
   }
 
- $ok = $ftp->_ACCT($acct || "")
-	if ($ok == CMD_MORE);
+ $ok = $ftp->_ACCT($acct)
+	if (defined($acct) && ($ok == CMD_MORE || $ok == CMD_OK));
 
- $ftp->authorize()
-    if($ok == CMD_OK && defined ${*$ftp}{'net_ftp_firewall'});
+ if($ok == CMD_OK && defined ${*$ftp}{'net_ftp_firewall'}) {
+   my($f,$auth,$resp) = _auth_id($ftp);
+   $ftp->authorize($auth,$resp) if defined($resp);
+ }
 
  $ok == CMD_OK;
 }
@@ -257,10 +286,7 @@ sub account
  $ftp->_ACCT($acct) == CMD_OK;
 }
 
-sub authorize
-{
- @_ >= 1 || @_ <= 3 or croak 'usage: $ftp->authorize( [AUTH [, RESP]])';
-
+sub _auth_id {
  my($ftp,$auth,$resp) = @_;
 
  unless(defined $resp)
@@ -275,6 +301,14 @@ sub authorize
    ($auth,$resp) = $rc->lpa()
      if($rc);
   }
+  ($ftp,$auth,$resp);
+}
+
+sub authorize
+{
+ @_ >= 1 || @_ <= 3 or croak 'usage: $ftp->authorize( [AUTH [, RESP]])';
+
+ my($ftp,$auth,$resp) = &_auth_id;
 
  my $ok = $ftp->_AUTH($auth || "");
 
@@ -334,14 +368,15 @@ sub get
  my($loc,$len,$buf,$resp,$localfd,$data);
  local *FD;
 
- $localfd = ref($local) ? fileno($local)
-			: undef;
+ $localfd = ref($local) || ref(\$local) eq "GLOB"
+             ? fileno($local)
+	     : undef;
 
  ($local = $remote) =~ s#^.*/##
 	unless(defined $local);
 
  croak("Bad remote filename '$remote'\n")
-	if $remote =~ /[\s\r\n]/s;
+	if $remote =~ /[\r\n]/s;
 
  ${*$ftp}{'net_ftp_rest'} = $where
 	if ($where);
@@ -372,17 +407,36 @@ sub get
   {
    carp "Cannot binmode Local file $local: $!\n";
    $data->abort;
+   close($loc) unless $localfd;
    return undef;
   }
 
  $buf = '';
- my $swlen;
- 
- do
+ my($count,$hashh,$hashb,$ref) = (0);
+
+ ($hashh,$hashb) = @$ref
+   if($ref = ${*$ftp}{'net_ftp_hash'});
+
+ while(1)
   {
-   $len = $data->read($buf,1024);
+   last unless $len = $data->read($buf,1024);
+   if($hashh) {
+    $count += $len;
+    print $hashh "#" x (int($count / $hashb));
+    $count %= $hashb;
+   }
+   my $written = syswrite($loc,$buf,$len);
+   unless(defined($written) && $written == $len)
+    {
+     carp "Cannot write to Local file $local: $!\n";
+     $data->abort;
+     close($loc)
+        unless defined $localfd;
+     return undef;
+    }
   }
- while($len && defined($swlen = syswrite($loc,$buf,$len)) && $swlen == $len);
+
+ print $hashh "\n" if $hashh;
 
  close($loc)
 	unless defined $localfd;
@@ -398,7 +452,7 @@ sub cwd
 
  my($ftp,$dir) = @_;
 
- $dir ||= "/";
+ $dir = "/" unless defined($dir) && $dir =~ /\S/;
 
  $dir eq ".."
     ? $ftp->_CDUP()
@@ -420,11 +474,54 @@ sub pwd
  $ftp->_extract_path;
 }
 
+# rmdir( $ftp, $dir, [ $recurse ] )
+#
+# Removes $dir on remote host via FTP.
+# $ftp is handle for remote host
+#
+# If $recurse is TRUE, the directory and deleted recursively.
+# This means all of its contents and subdirectories.
+#
+# Initial version contributed by Dinkum Software
+#
 sub rmdir
 {
- @_ == 2 || croak 'usage: $ftp->rmdir( DIR )';
+    @_ == 2 || @_ == 3 or croak('usage: $ftp->rmdir( DIR [, RECURSE ] )');
 
- $_[0]->_RMD($_[1]);
+    # Pick off the args
+    my ($ftp, $dir, $recurse) = @_ ;
+    my $ok;
+
+    return $ok
+	if $ftp->_RMD( $dir ) || !$recurse;
+
+    # Try to delete the contents
+    # Get a list of all the files in the directory
+    my $filelist = $ftp->ls($dir);
+
+    return undef
+	unless $filelist && @$filelist; # failed, it is probably not a directory
+
+    # Go thru and delete each file or the directory
+    my $file;
+    foreach $file (@$filelist)
+    {
+	next  # successfully deleted the file
+	    if $ftp->delete( $dir . '/' . $file);
+
+	# Failed to delete it, assume its a directory
+	# Recurse and ignore errors, the final rmdir() will
+	# fail on any errors here
+	return $ok
+	    unless $ok = $ftp->rmdir($dir . '/' . $file, 1) ;
+    }
+
+    # Directory should be empty
+    # Try to remove the directory again
+    # Pass results directly to caller
+    # If any of the prior deletes failed, this
+    # rmdir() will fail because directory is not empty
+    return $ftp->_RMD($dir) ;
 }
 
 sub mkdir
@@ -461,10 +558,10 @@ sub mkdir
      my($status,$message) = ($ftp->status,$ftp->message);
      my $pwd = $ftp->pwd;
      
-     if($pwd && $ftp->cd($dir))
+     if($pwd && $ftp->cwd($dir))
       {
        $path = $dir;
-       $ftp->cd($pwd);
+       $ftp->cwd($pwd);
       }
      else
       {
@@ -501,8 +598,9 @@ sub _store_cmd
  my($loc,$sock,$len,$buf,$localfd);
  local *FD;
 
- $localfd = ref($local) ? fileno($local)
-			: undef;
+ $localfd = ref($local) || ref(\$local) eq "GLOB"
+             ? fileno($local)
+	     : undef;
 
  unless(defined $remote)
   {
@@ -514,7 +612,7 @@ sub _store_cmd
   }
 
  croak("Bad remote filename '$remote'\n")
-	if $remote =~ /[\s\r\n]/s;
+	if $remote =~ /[\r\n]/s;
 
  if(defined $localfd)
   {
@@ -543,9 +641,21 @@ sub _store_cmd
  $sock = $ftp->_data_cmd($cmd, $remote) or 
 	return undef;
 
+ my $blk_size = ${*$ftp}{'net_ftp_blk_size'} || 10240;
+ my($count,$hashh,$hashb,$ref) = (0);
+
+ ($hashh,$hashb) = @$ref
+   if($ref = ${*$ftp}{'net_ftp_hash'});
+
  while(1)
   {
-   last unless $len = sysread($loc,$buf="",1024);
+   last unless $len = sysread($loc,$buf="",$blk_size);
+
+   if($hashh) {
+    $count += $len;
+    print $hashh "#" x (int($count / $hashb));
+    $count %= $hashb;
+   }
 
    my $wlen;
    unless(defined($wlen = $sock->write($buf,$len)) && $wlen == $len)
@@ -553,14 +663,18 @@ sub _store_cmd
      $sock->abort;
      close($loc)
 	unless defined $localfd;
+     print $hashh "\n" if $hashh;
      return undef;
     }
   }
 
- $sock->close();
+ print $hashh "\n" if $hashh;
 
  close($loc)
 	unless defined $localfd;
+
+ $sock->close() or
+	return undef;
 
  ($remote) = $ftp->message =~ /unique file name:\s*(\S*)\s*\)/
 	if ('STOU' eq uc $cmd);
@@ -583,12 +697,11 @@ sub port
 
    ${*$ftp}{'net_ftp_listen'} ||= IO::Socket::INET->new(Listen    => 5,
 				    	    	        Proto     => 'tcp',
-				    	    	        LocalAddr => $ftp->sockhost, 
 				    	    	       );
   
    my $listen = ${*$ftp}{'net_ftp_listen'};
 
-   my($myport, @myaddr) = ($listen->sockport, split(/\./,$listen->sockhost));
+   my($myport, @myaddr) = ($listen->sockport, split(/\./,$ftp->sockhost));
 
    $port = join(',', @myaddr, $myport >> 8, $myport & 0xff);
 
@@ -633,26 +746,38 @@ sub supported {
     return $hash->{$cmd}
         if exists $hash->{$cmd};
 
-    my $ok = $ftp->_HELP($cmd) &&
-        $ftp->message !~ /unimplemented/i;
+    return $hash->{$cmd} = 0
+	unless $ftp->_HELP($cmd);
 
-    $hash->{$cmd} = $ok;
+    my $text = $ftp->message;
+    if($text =~ /following\s+commands/i) {
+	$text =~ s/^.*\n//;
+	$text =~ s/\n/ /sog;
+	while($text =~ /(\w+)([* ])/g) {
+	    $hash->{"\U$1"} = $2 eq " " ? 1 : 0;
+	}
+    }
+    else {
+	$hash->{$cmd} = $text !~ /unimplemented/i;
+    }
+
+    $hash->{$cmd} ||= 0;
 }
 
 ##
-## Depreciated methods
+## Deprecated methods
 ##
 
 sub lsl
 {
- carp "Use of Net::FTP::lsl depreciated, use 'dir'"
+ carp "Use of Net::FTP::lsl deprecated, use 'dir'"
     if $^W;
  goto &dir;
 }
 
 sub authorise
 {
- carp "Use of Net::FTP::authorise depreciated, use 'authorize'"
+ carp "Use of Net::FTP::authorise deprecated, use 'authorize'"
     if $^W;
  goto &authorize;
 }
@@ -729,7 +854,7 @@ sub _list_cmd
 
  my $data = $ftp->_data_cmd($cmd,@_);
 
- return undef
+ return
 	unless(defined $data);
 
  require Net::FTP::A;
@@ -830,7 +955,7 @@ sub _data_cmd
 ## Over-ride methods (Net::Cmd)
 ##
 
-sub debug_text { $_[2] =~ /^(pass|resp)/i ? "$1 ....\n" : $_[2]; }
+sub debug_text { $_[2] =~ /^(pass|resp|acct)/i ? "$1 ....\n" : $_[2]; }
 
 sub command
 {
@@ -901,7 +1026,7 @@ sub pasv_wait
  my($ftp, $non_pasv) = @_;
  my($file,$rin,$rout);
 
- vec($rin,fileno($ftp),1) = 1;
+ vec($rin='',fileno($ftp),1) = 1;
  select($rout=$rin, undef, undef, undef);
 
  $ftp->response();
@@ -939,7 +1064,6 @@ sub _MKD  { shift->command("MKD", @_)->response() == CMD_OK }
 sub _PWD  { shift->command("PWD", @_)->response() == CMD_OK }
 sub _TYPE { shift->command("TYPE",@_)->response() == CMD_OK }
 sub _RNTO { shift->command("RNTO",@_)->response() == CMD_OK }
-sub _ACCT { shift->command("ACCT",@_)->response() == CMD_OK }
 sub _RESP { shift->command("RESP",@_)->response() == CMD_OK }
 sub _MDTM { shift->command("MDTM",@_)->response() == CMD_OK }
 sub _SIZE { shift->command("SIZE",@_)->response() == CMD_OK }
@@ -955,6 +1079,7 @@ sub _RNFR { shift->command("RNFR",@_)->response() == CMD_MORE }
 sub _REST { shift->command("REST",@_)->response() == CMD_MORE }
 sub _USER { shift->command("user",@_)->response() } # A certain brain dead firewall :-)
 sub _PASS { shift->command("PASS",@_)->response() }
+sub _ACCT { shift->command("ACCT",@_)->response() }
 sub _AUTH { shift->command("AUTH",@_)->response() }
 
 sub _ALLO { shift->unsupported(@_) }
@@ -976,8 +1101,8 @@ Net::FTP - FTP Client class
 
     use Net::FTP;
     
-    $ftp = Net::FTP->new("some.host.name");
-    $ftp->login("anonymous","me@here.there");
+    $ftp = Net::FTP->new("some.host.name", Debug => 0);
+    $ftp->login("anonymous",'me@here.there');
     $ftp->cwd("/pub");
     $ftp->get("that.file");
     $ftp->quit;
@@ -1047,6 +1172,11 @@ B<Passive> - If set to a non-zero value then all data transfers will be done
 using passive mode. This is not usually required except for some I<dumb>
 servers, and some firewall configurations. This can also be set by the
 environment variable C<FTP_PASSIVE>.
+
+B<Hash> - If TRUE, print hash marks (#) on STDERR every 1024 bytes.  This
+simply invokes the C<hash()> method for you, so that hash marks are displayed
+for all transfers.  You can, of course, call C<hash()> explicitly whenever
+you'd like.
 
 If the constructor fails undef will be returned and an error message will
 be in $@
@@ -1209,6 +1339,15 @@ may be different.
 =item supported ( CMD )
 
 Returns TRUE if the remote server supports the given command.
+
+=item hash ( [FILEHANDLE_GLOB_REF],[ BYTES_PER_HASH_MARK] )
+
+Called without parameters, or with the first argument false, hash marks
+are suppressed.  If the first argument is true but not a reference to a 
+file handle glob, then \*STDERR is used.  The second argument is the number
+of bytes per hash mark printed, and defaults to 1024.  In all cases the
+return value is a reference to an array of two:  the filehandle glob reference
+and the bytes per hash mark.
 
 =back
 

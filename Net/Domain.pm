@@ -16,7 +16,7 @@ use Net::Config;
 @ISA = qw(Exporter);
 @EXPORT_OK = qw(hostname hostdomain hostfqdn domainname);
 
-$VERSION = "2.09"; # $Id: //depot/libnet/Net/Domain.pm#7$
+$VERSION = "2.13"; # $Id: //depot/libnet/Net/Domain.pm#10 $
 
 my($host,$domain,$fqdn) = (undef,undef,undef);
 
@@ -33,7 +33,7 @@ sub _hostname {
         my ($name,$alias,$type,$len,@addr) =  gethostbyname($ENV{'COMPUTERNAME'}||'localhost');
         while (@addr)
          {
-          my $a = pop(@addr);
+          my $a = shift(@addr);
           $host = gethostbyaddr($a,Socket::AF_INET());
           last if defined $host;
          } 
@@ -46,6 +46,15 @@ sub _hostname {
     elsif ($^O eq 'MacOS') {
 	chomp ($host = `hostname`);
     }
+    elsif ($^O eq 'VMS') {   ## multiple varieties of net s/w makes this hard
+        $host = $ENV{'UCX$INET_HOST'} if defined($ENV{'UCX$INET_HOST'});
+        $host = $ENV{'MULTINET_HOST_NAME'} if defined($ENV{'MULTINET_HOST_NAME'});
+        if (index($host,'.') > 0) {
+           $fqdn = $host;
+           ($host,$domain) = $fqdn =~ /^([^\.]+)\.(.*)$/;
+        }
+        return $host;
+    }
     else {
 	local $SIG{'__DIE__'};
 
@@ -55,10 +64,12 @@ sub _hostname {
     	    eval {
     		package main;
      		require "syscall.ph";
+		defined(&main::SYS_gethostname);
     	    }
     	    || eval {
     		package main;
      		require "sys/syscall.ph";
+		defined(&main::SYS_gethostname);
     	    }
             and $host = (syscall(&main::SYS_gethostname, $tmp, 256) == 0)
 		    ? $tmp
@@ -214,6 +225,9 @@ sub domainname {
 
     return $fqdn = $host . "." . $domain
 	if($host !~ /\./ && $domain =~ /\./);
+
+    # For hosts that have no name, just an IP address
+    return $fqdn = $host if $host =~ /^\d+(\.\d+){3}$/;
 
     my @host   = split(/\./, $host);
     my @domain = split(/\./, $domain);

@@ -1,3 +1,133 @@
+Change 332 on 1999/09/18 by <gbarr@pobox.com> (Graham Barr)
+
+	Configure
+	- Fix typo
+
+Change 331 on 1999/09/18 by <gbarr@pobox.com> (Graham Barr)
+
+	Net::FTP
+	- get and put now accept *FD as well as \*FD for the local filehandle
+
+Change 330 on 1999/09/18 by <gbarr@pobox.com> (Graham Barr)
+
+	Net::Domain
+	- Added support for VMS as suggest by lane@DUPHY4.Physics.Drexel.Edu
+
+Change 329 on 1999/09/18 by <gbarr@pobox.com> (Graham Barr)
+
+	Net::Netrc
+	- Added support for spaces in passwords
+
+Change 328 on 1999/09/18 by <gbarr@pobox.com> (Graham Barr)
+
+	Net::Cmd
+	- Map \n's in commands to " "
+
+Change 327 on 1999/09/18 by <gbarr@pobox.com> (Graham Barr)
+
+	Net::Netrc
+	- Applied patch from Randy Merrell to fix / escaping
+
+Change 318 on 1999/08/06 by <gbarr@pobox.com> (Graham Barr)
+
+	Net::Cmd
+	- Remove use of defined(@ISA)
+
+Change 316 on 1999/07/11 by <gbarr@pobox.com> (Graham Barr)
+
+	Net::POP3
+	- Added ping method supplied by William Rolston <rolston@freerealtime.com>
+
+Change 309 on 1999/05/05 by <gbarr@pobox.com> (Graham Barr)
+
+	Net::FTP
+	- Check that writes to local file succeed
+
+Change 308 on 1999/05/05 by <gbarr@pobox.com> (Graham Barr)
+
+	Net::FTP
+	- Fix bug ->size when SIZE and STAT are not implemented
+
+Change 307 on 1999/05/05 by <gbarr@pobox.com> (Graham Barr)
+
+	Net::POP3
+	- The return value for apop is now the same as login
+
+Change 306 on 1999/05/05 by <gbarr@pobox.com> (Graham Barr)
+
+	Net::POP3
+	- login now returns "0E0" when there are no messages on te server.
+	  This is true in a boolean context, but zero in a numeric context
+
+Change 305 on 1999/05/05 by <gbarr@pobox.com> (Graham Barr)
+
+	Net::FTP::A
+	- Fixed bug when sending a file in ascii mode that already contains
+	  \r\n character sequences
+	- Made improvements to speed of \r\n <-> \n translation
+
+Change 304 on 1999/05/04 by <gbarr@pobox.com> (Graham Barr)
+
+	Net::FTP
+	- Added hash mark printing
+
+Change 183 on 1998/08/07 by <gbarr@pobox.com> (Graham Barr)
+
+	Net::Domain
+	- Fix problem with returning last name instead of first name for a
+	  win32 multi-homed machine
+
+Change 182 on 1998/08/07 by <gbarr@pobox.com> (Graham Barr)
+
+	Net::FTP
+	- _list_cmd returned (undef) instead of ()
+	- Fix typo in docs
+	
+	Net::NNTP
+	- Fix typo in docs
+
+Change 181 on 1998/08/05 by <gbarr@pobox.com> (Graham Barr)
+
+	Net::FTP
+	- Allow spaces in filenames (ick!)
+
+Change 179 on 1998/08/05 by <gbarr@pobox.com> (Graham Barr)
+
+	Net::FTP
+	- added new rmdir from Dunkin Software
+	- fix to the code generating the listen port
+
+Change 171 on 1998/07/09 by <gbarr@pobox.com> (Graham Barr)
+
+	Net::FTP
+	- login will now send ACCT if $acct is defined and the PASS
+	  command completed with 2xx or 3xx
+	- Added a check for the close of the dataconn in _store_cmd
+	- Debug trace will hide any parameter given to ACCT
+
+Change 167 on 1998/07/04 by <gbarr@pobox.com> (Graham Barr)
+
+	- Added Config.eg, an example Config.pm
+	- Removed set method from Net::Config
+	- Removed check for Data::Dumper from Makefile.PL
+
+Change 157 on 1998/06/20 by <gbarr@pobox.com> (Graham Barr)
+
+	Net::FTP
+	- Another small tweak to ->supported()
+
+Change 156 on 1998/06/19 by <gbarr@pobox.com> (Graham Barr)
+
+	Net::FTP
+	- Tweak to ->supported() to better detect reports from some
+	  servers (NcFTPd)
+
+Change 153 on 1998/06/17 by <gbarr@pobox.com> (Graham Barr)
+
+	Net::FTP
+	- Fix "Use of uninitialized" warning, patch from
+	  Lars Thegler <lth@dannet.dk>
+
 Change 148 on 1998/06/07 by <gbarr@pobox.com> (Graham Barr)
 
 	Net::SMTP

@@ -53,20 +53,20 @@ sub MY::post_initialize
 
 #--- Create Net::Config
 
-my $config_pm = "Net/Config.pm";
+my $config_pm = "Net/libnet.cfg";
 my $libnet_cfg = "libnet.cfg";
 
 # Use %INC and ExtUtils::MakeMaker to determine how this machine
 # maps package names to path names
 
 foreach (keys %INC) {
- last if ($config_pm = $_) =~ s/^ExtUtils(.)MakeMaker/Net${1}Config/;
+ last if ($config_pm = $_) =~ s/^ExtUtils(.)MakeMaker.pm/Net${1}libnet.cfg/;
 }
 
 system(($^O eq 'VMS' ? 'mcr ': ()),$^X, 'Configure')
 	unless -f $libnet_cfg;
 
- $self->{PM}->{$libnet_cfg} = $self->catfile('$(INST_ARCHLIBDIR)',$config_pm);
+ $self->{PM}->{$libnet_cfg} = $self->catfile('$(INST_LIBDIR)',$config_pm);
 
  "";
 }
@@ -83,33 +83,14 @@ chk_version(IO::Socket => '1.05') or
 	. "*** For Net::Cmd to work you require version 1.05, or later, of\n"
 	. "    IO/Socket.pm from CPAN/modules/by-module/IO/IO-x.x.tar.gz\n\n";
 
-chk_version(Data::Dumper => '0.01') or
-    warn  "\n"
-	. "*** To be able to use the dynamic capabilities of Net::Config\n"
-	. "    you will need to install Data::Dumper\n"
-	. "    You can obtain this from\n"
-	. "    CPAN/modules/by-module/Data/Data-Dumper-x.x.tar.gz\n\n";
-
 #--- Write the Makefile
-
-my @clean = qw(*% *.html *.b[ac]k *.old *.orig *.rej);
-
-push @clean, map { "*/$_" } @clean;
 
 WriteMakefile(
 	VERSION   => $VERSION,
 	DISTNAME  => $DISTNAME,
 	NAME      => $NAME,
-
-	'dist'    => {COMPRESS => 'gzip -9f',
-		      SUFFIX   => '.gz', 
-		      DIST_DEFAULT => 'all tardist',
-		     },
- 
-	'clean'   => {FILES => join(" ", @clean,  )},
 	'realclean'   => {FILES => $config_pm},
 	PREREQ_PM => {
-			Data::Dumper => 0.01,
 			Socket => 1.3,
 			IO::Socket => 1.05
 		    },

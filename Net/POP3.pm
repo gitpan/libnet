@@ -13,7 +13,7 @@ use Net::Cmd;
 use Carp;
 use Net::Config;
 
-$VERSION = "2.16"; # $Id: //depot/libnet/Net/POP3.pm#10$
+$VERSION = "2.20"; # $Id$
 
 @ISA = qw(Net::Cmd IO::Socket::INET);
 
@@ -124,9 +124,10 @@ sub apop
  return undef
     unless($me->_APOP($user,$md->hexdigest));
 
- $me->message =~ /(\d+)\s+message/io;
+ my $ret = ${*$me}{'net_pop3_count'} = ($me->message =~ /(\d+)\s+message/io)
+	? $1 : ($me->popstat)[0];
 
- ${*$me}{'net_pop3_count'} = $1 || 0;
+ $ret ? $ret : "0E0";
 }
 
 sub user
@@ -144,8 +145,10 @@ sub pass
  return undef
    unless($me->_PASS($pass));
 
- ${*$me}{'net_pop3_count'} = ($me->message =~ /(\d+)\s+message/io)
+ my $ret = ${*$me}{'net_pop3_count'} = ($me->message =~ /(\d+)\s+message/io)
 	? $1 : ($me->popstat)[0];
+
+ $ret ? $ret : "0E0";
 }
 
 sub reset
@@ -264,6 +267,17 @@ sub uidl
  return $uidl;
 }
 
+sub ping
+{
+ @_ == 2 or croak 'usage: $pop3->ping( USER )';
+ my $me = shift;
+
+ return () unless $me->_PING(@_) && $me->message =~ /(\d+)\D+(\d+)/;
+
+ ($1 || 0, $2 || 0);
+}
+
+ 
 sub _STAT { shift->command('STAT')->response() == CMD_OK }
 sub _LIST { shift->command('LIST',@_)->response() == CMD_OK }
 sub _RETR { shift->command('RETR',$_[0])->response() == CMD_OK }
@@ -272,10 +286,11 @@ sub _NOOP { shift->command('NOOP')->response() == CMD_OK }
 sub _RSET { shift->command('RSET')->response() == CMD_OK }
 sub _QUIT { shift->command('QUIT')->response() == CMD_OK }
 sub _TOP  { shift->command('TOP', @_)->response() == CMD_OK }
-sub _UIDL { shift->command('UIDL')->response() == CMD_OK }
+sub _UIDL { shift->command('UIDL',@_)->response() == CMD_OK }
 sub _USER { shift->command('USER',$_[0])->response() == CMD_OK }
 sub _PASS { shift->command('PASS',$_[0])->response() == CMD_OK }
 sub _APOP { shift->command('APOP',@_)->response() == CMD_OK }
+sub _PING { shift->command('PING',$_[0])->response() == CMD_OK }
 
 sub _RPOP { shift->command('RPOP',$_[0])->response() == CMD_OK }
 sub _LAST { shift->command('LAST')->response() == CMD_OK }
@@ -318,7 +333,7 @@ sub response
   }
  else
   {
-   $str =~ s/^\+ERR\s+//io;
+   $str =~ s/^-ERR\s+//io;
   }
 
  ${*$cmd}{'net_cmd_resp'} = [ $str ];
@@ -407,9 +422,11 @@ C<Net::POP3> uses C<Net::Netrc> to lookup the password using the host
 and username. If the username is not specified then the current user name
 will be used.
 
-Returns the number of messages in the mailbox.
+Returns the number of messages in the mailbox. However if there are no
+messages on the server the string C<"0E0"> will be returned. This is
+will give a true value in a boolean context, but zero in a numeric context.
 
-If the server cannot authenticate C<USER> the I<undef> will be returned.
+If there was an error authenticating the user then I<undef> will be returned.
 
 =item apop ( USER, PASS )
 
@@ -446,8 +463,13 @@ Returns the highest C<MSGNUM> of all the messages accessed.
 
 =item popstat ()
 
-Returns an array of two elements. These are the number of undeleted
+Returns a list of two elements. These are the number of undeleted
 elements and the size of the mbox in octets.
+
+=item ping ( USER )
+
+Returns a list of two elements. These are the number of new messages
+and the total number of messages for C<USER>.
 
 =item uidl ( [ MSGNUM ] )
 

@@ -11,7 +11,7 @@ use strict;
 use FileHandle;
 use vars qw($VERSION);
 
-$VERSION = "2.08"; # $Id: //depot/libnet/Net/Netrc.pm#4$
+$VERSION = "2.10"; # $Id: //depot/libnet/Net/Netrc.pm#4$
 
 my %netrc = ();
 
@@ -70,7 +70,10 @@ sub _readrc
        next;
       }
 
-     push(@tok, split(/[\s\n]+/, $_));
+     s/^\s*//;
+     chomp;
+     push(@tok, $+)
+       while(length && s/^("([^"]*)"|(\S+))\s*//);
 
 TOKEN:
      while(@tok)
@@ -92,7 +95,7 @@ TOKEN:
        if($tok eq "machine")
         {
          my $host = shift @tok;
-         $mach = bless {machine => $mach};
+         $mach = bless {machine => $host};
 
          $netrc{$host} = []
             unless exists($netrc{$host});
@@ -102,6 +105,8 @@ TOKEN:
         {
          next TOKEN unless $mach;
          my $value = shift @tok;
+         # Following line added by rmerrell to remove '/' escape char in .netrc
+         $value =~ s/\/\\/\\/g;
          $mach->{$1} = $value;
         }
        elsif($tok eq "macdef")
