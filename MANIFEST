@@ -1,0 +1,23 @@
+ChangeLog
+Hostname.pm.eg			Example replacement for Hostname.pm
+MANIFEST
+Makefile.PL
+Net/Cmd.pm			(v2.00) 
+Net/Domain.pm			(v2.00) DNS Domain name lookup
+Net/FTP.pm			(v2.00) RFC959 Client
+Net/NNTP.pm			(v2.00) 
+Net/Netrc.pm			(v2.00) .netrc lookup routines
+Net/POP3.pm			(v2.00) 
+Net/SMTP.pm			(v2.00) RFC821 Client
+Net/Telnet.pm			(v2.00) 
+Net/Time.pm			(v2.00) 
+README
+README.CPAN
+README.DEBUG
+demos/ftp
+demos/nntp
+demos/pop3
+demos/smtp.self
+demos/time
+t/hostname.t
+t/require.t
