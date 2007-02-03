@@ -3,7 +3,6 @@ Config.eg
 Configure
 Hostname.pm.eg			Example replacement for Hostname.pm
 MANIFEST
-META.yml			Module meta-data
 Makefile.PL
 Net/Cmd.pm
 Net/Config.pm
@@ -39,3 +38,4 @@ t/netrc.t
 t/nntp.t
 t/require.t
 t/smtp.t
+META.yml                                 Module meta-data (added by MakeMaker)
