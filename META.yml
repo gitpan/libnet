@@ -1,23 +1,25 @@
---- #YAML:1.0
-name:               libnet
-version:            1.22_01
-abstract:           Collection of Network protocol modules
+---
+abstract: 'Collection of Network protocol modules'
 author:
-    - Graham Barr <gbarr@pobox.com>
-license:            perl
-distribution_type:  module
+  - 'Graham Barr <gbarr@pobox.com>'
+build_requires:
+  ExtUtils::MakeMaker: 0
 configure_requires:
-    ExtUtils::MakeMaker:  0
-requires:
-    IO::Socket:  1.05
-    Socket:      1.3
-resources:
-    repository:  http://github.com/gbarr/perl-libnet
-no_index:
-    directory:
-        - t
-        - inc
-generated_by:       ExtUtils::MakeMaker version 6.48
+  ExtUtils::MakeMaker: 0
+dynamic_config: 1
+generated_by: 'ExtUtils::MakeMaker version 6.66, CPAN::Meta::Converter version 2.120921'
+license: perl
 meta-spec:
-    url:      http://module-build.sourceforge.net/META-spec-v1.4.html
-    version:  1.4
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: libnet
+no_index:
+  directory:
+    - t
+    - inc
+requires:
+  IO::Socket: 1.05
+  Socket: 1.3
+resources:
+  repository: http://github.com/steve-m-hay/perl-libnet
+version: 1.22_02

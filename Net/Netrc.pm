@@ -11,7 +11,7 @@ use strict;
 use FileHandle;
 use vars qw($VERSION $TESTING);
 
-$VERSION = "2.13";
+$VERSION = "2.13_01";
 
 my %netrc = ();
 
@@ -311,7 +311,7 @@ Return the account information for the netrc entry
 
 =item lpa ()
 
-Return a list of login, password and account information fir the netrc entry
+Return a list of login, password and account information for the netrc entry
 
 =back
 

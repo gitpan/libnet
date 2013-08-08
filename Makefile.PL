@@ -4,7 +4,7 @@
 
 $NAME     = 'Net';
 $DISTNAME = "libnet";
-$VERSION  = "1.22_01";
+$VERSION  = "1.22_02";
 
 BEGIN { require 5.002 }
 
@@ -102,7 +102,7 @@ WriteMakefile(
   ( eval { ExtUtils::MakeMaker->VERSION(6.46) } ? (
       META_MERGE => {
         resources => {    ##
-          repository => 'http://github.com/gbarr/perl-libnet',
+          repository => 'http://github.com/steve-m-hay/perl-libnet',
         },
       }
       )
@@ -114,7 +114,7 @@ WriteMakefile(
 sub MY::postamble {
   return <<'POSTAMBLE';
 
-mydist : distmeta distsignature tardist
+mydist : distmeta tardist
 
 POSTAMBLE
 
