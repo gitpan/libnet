@@ -37,11 +37,11 @@
          }
       }
    },
-   "release_status" : "testing",
+   "release_status" : "stable",
    "resources" : {
       "repository" : {
          "url" : "http://github.com/steve-m-hay/perl-libnet"
       }
    },
-   "version" : "1.22_02"
+   "version" : "1.23"
 }
