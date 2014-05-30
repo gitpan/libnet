@@ -48,7 +48,7 @@ MAIN: {
         ABSTRACT => 'Collection of network protocol modules',
         AUTHOR   => 'Graham Barr <gbarr@pobox.com>, Steve Hay <shay@cpan.org>',
         LICENSE  => 'perl_5',
-        VERSION  => '1.26',
+        VERSION  => '1.27',
 
         META_MERGE => {
             'meta-spec' => {
@@ -101,10 +101,7 @@ MAIN: {
         },
 
         TEST_REQUIRES => {
-            'Cwd'      => '0',
-            'IO::File' => '0',
-            'perl'     => '5.008001',
-            'strict'   => '0'
+            'Cwd' => '0'
         },
 
         PREREQ_PM => {
@@ -121,7 +118,6 @@ MAIN: {
             'Socket'         => '1.3',
             'Symbol'         => '0',
             'Time::Local'    => '0',
-            'perl'           => '5.008001',
             'strict'         => '0',
             'vars'           => '0'
         },

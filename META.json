@@ -79,10 +79,7 @@
       },
       "test" : {
          "requires" : {
-            "Cwd" : "0",
-            "IO::File" : "0",
-            "perl" : "5.008001",
-            "strict" : "0"
+            "Cwd" : "0"
          }
       }
    },
@@ -93,5 +90,5 @@
          "url" : "https://github.com/steve-m-hay/perl-libnet.git"
       }
    },
-   "version" : "1.26"
+   "version" : "1.27"
 }
