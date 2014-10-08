@@ -1,13 +1,19 @@
-#!/usr/local/bin/perl
+#!perl
 #
 # $Id: Configure,v 1.8 1997/03/04 09:22:32 gbarr Exp $
 
-use strict;
-use IO::File;
-use Getopt::Std;
-use ExtUtils::MakeMaker qw(prompt);
+use 5.008001;
 
-use vars qw($opt_d $opt_o);
+use strict;
+use warnings;
+
+use ExtUtils::MakeMaker qw(prompt);
+use Getopt::Std;
+use IO::File;
+
+## no critic (Subroutines::ProhibitSubroutinePrototypes)
+
+our($opt_d, $opt_o);
 
 ##
 ##
@@ -37,10 +43,9 @@ sub test_hostnames (\@)
 {
  my $hlist = shift;
  my @h = ();
- my $host;
  my $err = 0;
 
- foreach $host (@$hlist)
+ foreach my $host (@$hlist)
   {
    if(valid_host($host))
     {
@@ -213,10 +218,9 @@ MASK:
 
 sub default_hostname
 {
- my $host;
  my @host;
 
- foreach $host (@_)
+ foreach my $host (@_)
   {
    if(defined($host) && valid_host($host))
     {
@@ -240,7 +244,10 @@ $libnet_cfg = "libnet.cfg"
 
 my %oldcfg = ();
 
+{
+no warnings 'once';
 $Net::Config::CONFIGURE = 1; # Suppress load of user overrides
+}
 if( -f $libnet_cfg )
  {
   %oldcfg = ( %{ do $libnet_cfg } );
@@ -248,7 +255,10 @@ if( -f $libnet_cfg )
 elsif (eval { require Net::Config }) 
  {
   $have_old = 1;
+  {
+  no warnings 'once';
   %oldcfg = %Net::Config::NetConfig;
+  }
  }
 
 map { $cfg{lc $_} = $cfg{$_}; delete $cfg{$_} if /[A-Z]/ } keys %cfg;
@@ -567,8 +577,7 @@ print "Writing $libnet_cfg\n";
 
 print $fh "{\n";
 
-my $key;
-foreach $key (keys %cfg) {
+foreach my $key (keys %cfg) {
     my $val = $cfg{$key};
     if(!defined($val)) {
         $val = "undef";

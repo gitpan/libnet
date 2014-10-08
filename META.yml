@@ -3,6 +3,7 @@ abstract: 'Collection of network protocol modules'
 author:
   - 'Graham Barr <gbarr@pobox.com>, Steve Hay <shay@cpan.org>'
 build_requires:
+  Config: '0'
   Cwd: '0'
   ExtUtils::MakeMaker: '0'
 configure_requires:
@@ -33,6 +34,20 @@ optional_features:
     requires:
       Authen::SASL: '0'
       MIME::Base64: '0'
+  IPv6:
+    description: 'IPv6 support'
+    requires:
+      IO::Socket::IP: '0.20'
+  SSL:
+    description: 'SSL support'
+    requires:
+      IO::Socket::SSL: '1.994'
+  critictest:
+    description: 'Perl::Critic testing'
+  podcoveragetest:
+    description: 'POD coverage testing'
+  podtest:
+    description: 'POD testing'
 requires:
   Carp: '0'
   Errno: '0'
@@ -46,9 +61,10 @@ requires:
   Socket: '1.3'
   Symbol: '0'
   Time::Local: '0'
+  constant: '0'
   perl: '5.008001'
   strict: '0'
   vars: '0'
 resources:
   repository: https://github.com/steve-m-hay/perl-libnet.git
-version: '1.27'
+version: '1.28'

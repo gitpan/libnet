@@ -1,3 +1,37 @@
+libnet 1.28  -- Wed Oct 08 2014
+
+  * Improve code()/message() initialization and error handling in Net::Cmd
+    [Tom Metro; resolves CPAN RT#14875]
+  * Don't use the ALLO command on FTP servers that don't support it.  [Resolves
+    CPAN RT#95717]
+  * Stop Makefile.PL from requiring interactive configuration when running via
+    cpan, cpanp or cpanm: just accept all defaults in these cases, as when
+    running non-interactively.  [Resolves CPAN RT#48966]
+  * Add optional POD coverage testing.
+  * Add optional POD testing.
+  * Add optional Perl::Critic testing.
+  * Make code Perl::Critic clean.
+  * Move Net/*.pm into lib/Net/ sub-directory within distribution. This is the
+    usual layout style these days.
+  * Change Net::SMTP::auth() so that it now falls back to another supported AUTH
+    method if a given AUTH method fails.  [Ivan Baktsheev; closes PR#3]
+  * Change Net::SMTP::auth() so that it uses the SMTP AUTH mechanism(s)
+    specified in the Authen::SASL object if one is provided instead of a
+    username.   If a plain text username is specified then use the first
+    reported SMTP AUTH method supported, as usual.  [Ewen McNeill; resolves CPAN
+    RT#58002]
+  * Add support for IPv6 and SSL to Net::FTP, Net::NNTP, Net::POP3 and
+    Net::SMTP.  These features are only available if the user has
+
+      a recent IO::Socket::SSL for SSL support
+      a recent IO::Socket::IP or an older IO::Socket::INET6 for IPv6 support
+
+    If no SSL module is available it will work as before, but attempts to use
+    the SSL functionality will result in an error message.  If no IPv6 modules
+    are available it will just use IPv4 as before.  With IPv6 modules installed
+    one can of course still access IPv4 hosts.
+    [Steffen Ullrich; resolves CPAN RT#93823]
+
 libnet 1.27  -- Fri May 30 2014
 
   * Simplified Makefile.PL requirements.
