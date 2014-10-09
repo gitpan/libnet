@@ -41,7 +41,7 @@ optional_features:
   SSL:
     description: 'SSL support'
     requires:
-      IO::Socket::SSL: '1.994'
+      IO::Socket::SSL: '1.999'
   critictest:
     description: 'Perl::Critic testing'
   podcoveragetest:
@@ -67,4 +67,4 @@ requires:
   vars: '0'
 resources:
   repository: https://github.com/steve-m-hay/perl-libnet.git
-version: '3.00'
+version: '3.01'

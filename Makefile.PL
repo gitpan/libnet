@@ -64,7 +64,7 @@ MAIN: {
         ABSTRACT => 'Collection of network protocol modules',
         AUTHOR   => 'Graham Barr <gbarr@pobox.com>, Steve Hay <shay@cpan.org>',
         LICENSE  => 'perl_5',
-        VERSION  => '3.00',
+        VERSION  => '3.01',
 
         META_MERGE => {
             'meta-spec' => {
@@ -107,7 +107,7 @@ MAIN: {
                     prereqs => {
                         runtime => {
                             requires => {
-                                'IO::Socket::SSL' => '1.994'
+                                'IO::Socket::SSL' => '1.999'
                             }
                         }
                     }
