@@ -1,3 +1,10 @@
+libnet 3.00  -- Thu Oct 09 2014
+
+  * Skip Perl Critic, Pod and Pod Coverage tests unless AUTHOR_TESTING.
+    [Resolves CPAN RT#99399]
+  * Synchronize all $VERSIONs to the distribution's version number, bumping that
+    to 3.00 so that no $VERSIONs end up going backwards.
+
 libnet 1.30  -- Wed Oct 08 2014
 
   * Sigh. Fix PAUSE indexing problem again. Net::SMTP::SSL is already used by
