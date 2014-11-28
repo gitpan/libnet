@@ -56,7 +56,7 @@
          "prereqs" : {
             "runtime" : {
                "requires" : {
-                  "IO::Socket::SSL" : "1.999"
+                  "IO::Socket::SSL" : "2.007"
                }
             }
          }
@@ -119,7 +119,7 @@
             "IO::Select" : "0",
             "IO::Socket" : "1.05",
             "POSIX" : "0",
-            "Socket" : "1.3",
+            "Socket" : "2.016",
             "Symbol" : "0",
             "Time::Local" : "0",
             "constant" : "0",
@@ -142,5 +142,5 @@
          "url" : "https://github.com/steve-m-hay/perl-libnet.git"
       }
    },
-   "version" : "3.02"
+   "version" : "3.03"
 }
